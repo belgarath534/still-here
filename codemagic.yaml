@@ -52,6 +52,10 @@ workflows:
     environment:
       xcode: latest
       ios_signing:
+        # Codemagic needs one stored profile here to install the signing certificate;
+        # the Still Here profile itself is downloaded from Apple in the first step.
+        provisioning_profiles:
+          - Dungeon Descent Live Activity App Store
         certificates:
           - Accessible Backrooms Distribution
     scripts:
