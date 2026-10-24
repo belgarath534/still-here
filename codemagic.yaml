@@ -2,6 +2,21 @@
 # Start "Still Here check" first: it play-tests every chapter and builds the app without signing.
 # "Still Here TestFlight" signs the app and uploads it to App Store Connect.
 workflows:
+  still-here-setup:
+    name: Still Here setup (one time, registers the app ID with Apple)
+    instance_type: mac_mini_m2
+    max_build_duration: 10
+    integrations:
+      app_store_connect: Accessible Backrooms
+    scripts:
+      - name: Register com.stillhere.horror
+        script: |
+          if app-store-connect bundle-ids list --bundle-id-identifier com.stillhere.horror --strict-match-identifier | grep -q com.stillhere.horror; then
+            echo "Already registered"
+          else
+            app-store-connect bundle-ids create com.stillhere.horror --name "Still Here" --platform IOS
+          fi
+
   still-here-check:
     name: Still Here check (no signing)
     instance_type: mac_mini_m2
