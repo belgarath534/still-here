@@ -1,0 +1,60 @@
+# Still Here, native iPhone version.
+# Start "Still Here check" first: it play-tests every chapter and builds the app without signing.
+# "Still Here TestFlight" signs the app and uploads it to App Store Connect.
+workflows:
+  still-here-check:
+    name: Still Here check (no signing)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+    scripts:
+      - name: Play-test every chapter (fast, no sound)
+        script: |
+          swift run StillHereSim
+      - name: Build the app for iPhone (unsigned)
+        script: |
+          set -o pipefail
+          xcodebuild \
+            -project StillHere.xcodeproj \
+            -scheme StillHere \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$CM_BUILD_DIR/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build 2>&1 | tee /tmp/xcodebuild.log | grep -E "error:|warning: .*StillHere|BUILD (SUCCEEDED|FAILED)"
+    artifacts:
+      - /tmp/xcodebuild.log
+
+  still-here-testflight:
+    name: Still Here TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Accessible Backrooms
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.stillhere.horror
+    scripts:
+      - name: Use the App Store signing profiles
+        script: |
+          xcode-project use-profiles
+      - name: Set build number
+        script: |
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" StillHere.xcodeproj/project.pbxproj
+      - name: Build signed IPA
+        script: |
+          xcode-project build-ipa \
+            --project StillHere.xcodeproj \
+            --scheme StillHere
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
