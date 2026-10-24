@@ -11,6 +11,7 @@ jobs:
       - name: Play-test every chapter (fast, no sound)
         run: swift run StillHereSim
       - name: Build the app for iPhone (unsigned)
+        if: success() || failure()
         run: |
           set -o pipefail
           xcodebuild -version

@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "StillHereCore",
+    platforms: [.macOS(.v14), .iOS(.v17)],
     targets: [
         .target(name: "StillHereCore", path: "StillHere/Core"),
         .executableTarget(name: "StillHereSim", dependencies: ["StillHereCore"], path: "Tests/StillHereSim",
