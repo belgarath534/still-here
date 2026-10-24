@@ -52,9 +52,17 @@ workflows:
     environment:
       xcode: latest
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.stillhere.horror
+        certificates:
+          - Accessible Backrooms Distribution
     scripts:
+      - name: Get the App Store profile from Apple
+        script: |
+          # Uses the App Store Connect key from the integration above.
+          DEST="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$DEST"
+          app-store-connect profiles list --type IOS_APP_STORE --state ACTIVE \
+            --name "Still Here App Store" --save --profiles-dir "$DEST"
+          ls "$DEST"
       - name: Use the App Store signing profiles
         script: |
           xcode-project use-profiles
