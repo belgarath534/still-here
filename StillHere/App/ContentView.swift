@@ -14,6 +14,8 @@ struct ContentView: View {
     @AccessibilityFocusState private var narrationFocused: Bool
     @AccessibilityFocusState private var pauseFocused: Bool
     @Environment(\.scenePhase) private var phase
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var wide: Bool { sizeClass == .regular }
 
     var body: some View {
         ZStack {
@@ -27,9 +29,11 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 40)
                     .padding(.bottom, 60)
-                    .frame(maxWidth: 640, alignment: .leading)
+                    .frame(maxWidth: wide ? 860 : 640, alignment: .leading)
                     .frame(maxWidth: .infinity)
                 }
+                // bigger text on iPad, while still following larger text settings
+                .dynamicTypeSize(wide ? DynamicTypeSize.xxxLarge... : DynamicTypeSize.xSmall...)
                 .onChange(of: model.screen.id) { proxy.scrollTo("top", anchor: .top) }
             }
             .opacity(model.screen.dark ? 0.35 : 1)
