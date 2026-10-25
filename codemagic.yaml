@@ -22,7 +22,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
-      xcode: latest
+      xcode: 27.1
     scripts:
       - name: Play-test every chapter (fast, no sound)
         script: |
@@ -50,7 +50,7 @@ workflows:
     integrations:
       app_store_connect: Accessible Backrooms
     environment:
-      xcode: latest
+      xcode: 27.1
       ios_signing:
         # Codemagic needs one stored profile here to install the signing certificate;
         # the Still Here profile itself is downloaded from Apple in the first step.
