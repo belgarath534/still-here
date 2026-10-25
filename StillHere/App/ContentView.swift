@@ -18,16 +18,19 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             background
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    content
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        header.id("top")
+                        content
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 40)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: 640, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 40)
-                .padding(.bottom, 60)
-                .frame(maxWidth: 640, alignment: .leading)
-                .frame(maxWidth: .infinity)
+                .onChange(of: model.screen.id) { proxy.scrollTo("top", anchor: .top) }
             }
             .opacity(model.screen.dark ? 0.35 : 1)
             .animation(.easeInOut(duration: 3), value: model.screen.dark)
@@ -76,9 +79,14 @@ struct ContentView: View {
         }
     }
 
+    /// Every scene is a brand-new element, so moving VoiceOver to it reads it out,
+    /// even when the previous scene's text was focused.
     private func focusNarration() {
         narrationFocused = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { narrationFocused = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            UIAccessibility.post(notification: .screenChanged, argument: nil)
+            narrationFocused = true
+        }
     }
 
     private var background: some View {
@@ -116,23 +124,37 @@ struct ContentView: View {
     @ViewBuilder private var content: some View {
         let s = model.screen
         let splash = s.mode == .splash
-        if !s.title.isEmpty {
-            Text(s.title.uppercased())
-                .font(serif(18, .headline))
-                .kerning(3)
-                .foregroundStyle(dim)
-                .padding(.bottom, 16)
-                .accessibilityLabel(s.title)
-                .accessibilityAddTraits(.isHeader)
+        // the scene title and text are read together, as one new element per scene
+        VStack(alignment: .leading, spacing: 16) {
+            if !s.title.isEmpty {
+                Text(s.title.uppercased())
+                    .font(serif(18, .headline))
+                    .kerning(3)
+                    .foregroundStyle(dim)
+            }
+            Text(s.text.isEmpty ? " " : s.text)
+                .font(serif(21))
+                .lineSpacing(6)
+                .foregroundStyle(splash ? dim : ink)
+                .multilineTextAlignment(splash ? .center : .leading)
+                .frame(maxWidth: .infinity, alignment: splash ? .center : .leading)
         }
-        Text(s.text.isEmpty ? " " : s.text)
-            .font(serif(21))
-            .lineSpacing(6)
-            .foregroundStyle(splash ? dim : ink)
-            .multilineTextAlignment(splash ? .center : .leading)
-            .frame(maxWidth: .infinity, alignment: splash ? .center : .leading)
-            .accessibilityFocused($narrationFocused)
-            .accessibilityAction(.magicTap) { model.togglePause() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(s.title.isEmpty ? (s.text.isEmpty ? " " : s.text) : s.title + ". " + s.text)
+        .accessibilityAddTraits(s.title.isEmpty ? [] : .isHeader)
+        .accessibilityFocused($narrationFocused)
+        .accessibilityAction(.magicTap) { model.togglePause() }
+        .id("scene-\(s.id)")
+        // while waiting, what just happened stays readable
+        if s.text == "Listen.", let last = model.lastScene {
+            Text("Before this: " + last)
+                .font(serif(17))
+                .lineSpacing(4)
+                .foregroundStyle(dim)
+                .padding(.top, 28)
+                .accessibilityLabel("Before this: " + last)
+                .accessibilityAction(.magicTap) { model.togglePause() }
+        }
         VStack(spacing: 12) {
             ForEach(Array(s.choices.enumerated()), id: \.offset) { i, c in
                 Button { choose(i, screenID: s.id) } label: {

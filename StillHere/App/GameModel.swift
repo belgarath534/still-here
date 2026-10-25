@@ -9,7 +9,17 @@ final class GameModel: ObservableObject, GameView {
     @Published var note: String? = nil
     private var noteThen: (() -> Void)? = nil
 
-    func render(_ s: Screen) { screen = s }
+    /// The last scene that had something to read, shown under "Listen." while you wait.
+    @Published var lastScene: String? = nil
+
+    func render(_ s: Screen) {
+        let old = screen
+        if old.mode == .game, !old.text.isEmpty, old.text != "Listen.", old.text != "Loading…" {
+            lastScene = old.title.isEmpty ? old.text : old.title + ". " + old.text
+        }
+        if s.mode != .game { lastScene = nil }
+        screen = s
+    }
 
     func announce(_ msg: String) {
         // queued, so it doesn't cut off whatever VoiceOver is already reading
