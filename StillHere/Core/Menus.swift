@@ -25,6 +25,7 @@ func startGame() {
     audio.setMusicVolume(opts.musicVol)
     registerMenus()
     registerStory()
+    registerEndless()
     go("splash")
 }
 
@@ -96,6 +97,7 @@ func registerMenus() {
         if let cp = checkpoint, SCENES[cp] != nil { choices.append(Choice("Continue: " + chapterOf(cp).name) { try await start(cp) }) }
         choices += [
             Choice("New game") { try await start("s1") },
+            Choice("Endless Night: survival mode" + (bestNight > 0 ? ", best " + str(bestNight) : "")) { try await start("e_start") },
             Choice("Chapters", to("chapters")),
             Choice("Settings", to("settings")),
             Choice("Endings found: " + str(endings.length) + " of " + str(ENDINGS.length), to("endings")),

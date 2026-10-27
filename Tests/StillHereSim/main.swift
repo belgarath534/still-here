@@ -381,6 +381,57 @@ var currentRun = ""
     try await waitTitle("It left")
 }
 
+
+/// Plays three nights of Endless Night.
+@MainActor func endless() async throws {
+    try await waitTitle("Endless Night"); try await click("Begin")
+    var dawns = 0
+    var handled = -1
+    while true {
+        try await waitFor("something to do") {
+            screen.id != handled && (screen.title.hasPrefix("Night") || screen.title == "Dawn" || screen.title == "The night is over")
+        }
+        let s = screen
+        handled = s.id
+        if s.title == "The night is over" { throw Failure(msg: "died: " + s.text) }
+        if s.title == "Dawn" {
+            dawns += 1
+            if dawns == 3 { return }
+            try await click("Next night"); continue
+        }
+        if s.choices.first?.label == "Listen" { try await click("Listen"); continue }
+        if s.choices.first?.label == "Keep listening" { continue }
+        switch lastEncounter {
+        case "dodge": try await waitFor("rush") { eLive }; try await click(eSide > 0 ? "Dodge left" : "Dodge right")
+        case "window": try await waitFor("tap") { eLive }; try await click(eSide < 0 ? "Lock the left" : "Lock the right")
+        case "door": try await click(eReal ? "Open the door" : "Stay quiet")
+        case "vents": try await waitFor("crawl") { eLive }; try await click(eSide > 0 ? "Go left" : "Go right")
+        case "breath":
+            try await waitFor("breath") { eLive }
+            try await click(s.choices[0].label)
+            try await waitFor("breath over") { !eLive || screen.choices.first?.label == "Keep listening" }
+        default: break // hold still: do nothing
+        }
+    }
+}
+
+
+/// Makes a wrong move on purpose and checks the end of the run and the best score.
+@MainActor func endlessDeath() async throws {
+    bestNight = 0
+    try await waitTitle("Endless Night"); try await click("Begin")
+    try await waitTitle("Night 1"); try await click("Listen")
+    try await waitFor("an encounter with a choice") { screen.title.hasPrefix("Night 1,") && !screen.choices.isEmpty }
+    let wrong = screen.choices.last!.label
+    if lastEncounter == "hold" { try await click(wrong) }
+    else if lastEncounter == "door" { try await click(eReal ? "Stay quiet" : "Open the door") }
+    else { try await waitFor("live") { eLive }; try await click(lastEncounter == "breath" ? wrong : lastEncounter == "window" ? (eSide < 0 ? "Lock the right" : "Lock the left") : lastEncounter == "dodge" ? (eSide > 0 ? "Dodge right" : "Dodge left") : (eSide > 0 ? "Go right" : "Go left")) }
+    if lastEncounter == "breath" && eLive { return } // pressed during a breath: that's allowed
+    try await waitTitle("The night is over")
+    guard screen.text.contains("You survived 0 nights") else { throw Failure(msg: "unexpected end text: " + screen.text) }
+    try await click("Try again"); try await waitTitle("Endless Night")
+}
+
 /* ---------- runner ---------- */
 
 let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
@@ -392,6 +443,7 @@ let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
     ("ch12-silence", "c12", { closeness = 5; toldTruth = 3; try await ch12("silence") }),
     ("ch13", "c13", ch13), ("ch14", "c14", ch14), ("ch15-keep", "c15", { try await ch15(true) }), ("ch15-burn", "c15", { try await ch15(false) }),
     ("ch16-delete", "c16", { try await ch16(true) }), ("ch16-echo", "c16", { try await ch16(false) }),
+    ("endless", "e_start", endless), ("endless-death", "e_start", endlessDeath),
 ]
 
 @MainActor func runAll() async {
