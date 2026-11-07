@@ -40,7 +40,12 @@ var zTrained: Bool {
     set { UserDefaults.standard.set(newValue, forKey: "stillhere-ztrained") }
 }
 
-let Z_SFX = ["z_groan0", "z_groan1", "z_groan2", "z_groan3", "z_shuffle0", "z_shuffle1", "z_shot", "z_reload", "z_die0", "z_die1", "z_bite", "z_click"]
+let Z_GROANS = 9
+let Z_SFX = (0..<Z_GROANS).map { "z_groan\($0)" } + (0..<6).map { "z_step\($0)" } +
+    ["z_shuffle0", "z_shuffle1", "z_shot0", "z_shot1", "z_reload", "z_die0", "z_die1", "z_bite", "z_click"]
+/// You keep walking on your own, toward wherever you face. Metres per second.
+let WALK = 0.25
+var zStepIn = 0.0, zStepN = 0
 
 /* ---------- where things are ---------- */
 
@@ -57,10 +62,10 @@ func zDirName(_ rel: Int) -> String {
 func zDistName(_ d: Double) -> String { d < 2.5 ? "very close" : d < 5 ? "close" : "far" }
 
 private func zSound(_ z: inout Zombie) {
-    let rate = z.kind == "brute" ? 0.8 : z.kind == "runner" ? 1.18 : 0.95 + Math.random() * 0.1
+    let rate = z.kind == "brute" ? 0.8 : z.kind == "runner" ? 1.15 : 0.92 + Math.random() * 0.14
     let near = z.dist < 3
     if z.groanNext || near {
-        play("z_groan" + str(Int(Math.random() * 4)), place(zRel(z), z.dist) + [.rate(rate), .gain(z.kind == "brute" ? 1.6 : 1.3)])
+        play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(zRel(z), z.dist) + [.rate(rate), .gain(z.kind == "brute" ? 1.6 : 1.3)])
     } else {
         play("z_shuffle" + str(Int(Math.random() * 2)), place(zRel(z), z.dist) + [.rate(rate), .gain(1.1)])
     }
@@ -98,8 +103,19 @@ func zTick(_ dt: Double) {
             zSpawnIn = Swift.max(3.5 - Double(zWave) * 0.25, 1.5) + Math.random()
         }
     }
+    // your own footsteps, under you
+    if zTrain < 0 {
+        zStepIn -= dt
+        if zStepIn <= 0 {
+            zStepN += 1
+            play("z_step" + str(Int(Math.random() * 6)), [.x(zStepN % 2 == 0 ? -0.15 : 0.15), .y(-1.4), .z(0), .gain(0.55), .rate(0.95 + Math.random() * 0.1)])
+            zStepIn = 0.62
+        }
+    }
     for i in zZombies.indices {
-        zZombies[i].dist -= zZombies[i].speed * dt
+        // walking toward one brings it closer faster; walking away buys time
+        let walk = zTrain < 0 ? WALK * cos(Double(zRel(zZombies[i])) * Double.pi / 4) : 0
+        zZombies[i].dist -= (zZombies[i].speed + walk) * dt
         zZombies[i].nextSound -= dt
         if zZombies[i].nextSound <= 0 { zSound(&zZombies[i]) }
     }
@@ -150,7 +166,7 @@ private func zShoot() {
     }
     zAmmo -= 1
     zShots += 1
-    play("z_shot", [.z(-0.5), .gain(1.3)])
+    play("z_shot" + str(zShots % 2), [.z(-0.5), .gain(1.3)])
     audio.haptic("knock")
     let ahead = zZombies.filter { zRel($0) == 0 }.sorted { $0.dist < $1.dist }
     if var z = ahead.first, let i = zZombies.firstIndex(where: { $0.id == z.id }) {
@@ -164,7 +180,7 @@ private func zShoot() {
         } else {
             zZombies[i] = z
             zZombies[i].dist += 1.2   // it staggers back
-            play("z_groan" + str(Int(Math.random() * 4)), place(0, z.dist + 1.2) + [.delay(0.15), .rate(0.75), .gain(1.6)])
+            play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(0, z.dist + 1.2) + [.delay(0.15), .rate(0.75), .gain(1.6)])
         }
     }
     if zAmmo == 0 { after(400) { if zRunning && zAmmo == 0 && !zReloading { say("Empty.") } } }
@@ -208,7 +224,7 @@ private func zAfterKill() {
 
 /* ---------- waves ---------- */
 
-private let HOWTO = "Swipe left or right to turn. Tap to shoot when the groaning is in the middle of your head. Swipe down to reload. Swipe up to hear your bullets, health and what's left. Two fingers double-tap to pause."
+private let HOWTO = "You keep walking on your own, toward wherever you face. Swipe left or right to turn. Tap to shoot when the groaning is in the middle of your head. Swipe down to reload. Swipe up to hear your bullets, health and what's left. Two fingers double-tap to pause."
 
 private func arena(_ title: String, _ intro: String) {
     show(title, intro, [], .arena)
@@ -226,8 +242,9 @@ private func zStartWave() {
     zAmmo = CLIP
     zReloading = false
     zRunning = true
-    music("m_drone", 0.1, 3)
+    music(zWave >= 4 ? "m_zfight2" : "m_zfight", 0.2, 3)
     wind(0.05)
+    zStepIn = 1
     arena("Wave " + str(zWave), "Wave " + str(zWave) + ". " + str(waveSize()) + " of them. " + (zWave == 1 ? "They're coming from in front of you and the sides." : zWave == 3 ? "From now on, they can come from behind you too." : "Listen."))
     spawn {
         while zRunning {
@@ -241,6 +258,7 @@ private func zWaveCleared() {
     zRunning = false
     clearScene()
     if zWave > bestWave { bestWave = zWave }
+    music("m_zrest", 0.22, 3)
     let healed = zHealth < 3
     zHealth = Swift.min(zHealth + 1, 3)
     chime()
@@ -257,6 +275,7 @@ private func zDie() {
     show("", "", [])
     scream()
     after(2600) {
+        music("m_zrest", 0.22, 3)
         let cleared = zWave - 1
         let record = cleared > bestWave
         if record { bestWave = cleared }

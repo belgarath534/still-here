@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Makes the Last Stand sounds (zombies, pistol) from scratch and writes them as mp3 files.
+"""Makes the Last Stand dry-fire click from scratch and writes them as mp3 files.
 Usage: python3 tools/zombie_sounds.py   (needs numpy, scipy and ffmpeg)"""
 import os, subprocess, tempfile, wave
 import numpy as np
@@ -179,15 +179,5 @@ def bite():
 
 
 if __name__ == "__main__":
-    save("z_groan0", groan(1, 2.0, 82, 66, [UH, AH, UH]))
-    save("z_groan1", groan(2, 1.7, 95, 72, [OH, UH]))
-    save("z_groan2", groan(3, 2.2, 70, 60, [AH, OH, UH]))
-    save("z_groan3", groan(4, 1.5, 105, 80, [ER, AH]))
-    save("z_shuffle0", shuffle(5))
-    save("z_shuffle1", shuffle(6))
-    save("z_shot", gunshot())
+    # The other Last Stand sounds are real recordings now (tools/import_zombie_sounds.py).
     save("z_click", dryfire())
-    save("z_reload", reload_())
-    save("z_die0", die(8))
-    save("z_die1", die(9))
-    save("z_bite", bite())

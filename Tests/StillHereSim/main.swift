@@ -472,7 +472,11 @@ var currentRun = ""
     while true {
         if screen.title == "Overrun" { throw Failure(msg: "overrun: " + screen.text) }
         if screen.title.hasSuffix("cleared") {
-            if zWave == 3 { guard bestWave == 3 else { throw Failure(msg: "best wave not saved") }; return }
+            if zWave == 3 {
+                guard bestWave == 3 else { throw Failure(msg: "best wave not saved") }
+                guard mockAudio.played.contains(where: { $0.hasPrefix("z_step") }) else { throw Failure(msg: "no footsteps while walking") }
+                return
+            }
             try await click("Next wave"); continue
         }
         if zRunning { fightStep() }
