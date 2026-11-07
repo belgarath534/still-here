@@ -57,9 +57,10 @@ var zStepIn = 0.0, zStepN = 0
 
 /// how many lanes to the right of your aim it is (negative: to the left)
 func zRel(_ z: Zombie) -> Int { z.lane - zAim }
-/// where a lane is: spread across the front, 40 degrees apart
+/// where a lane is: spread across the front, 30 degrees apart. Zombies, the aim note and the
+/// aim tick all use this, so a lane always sounds in the same place.
 private func place(lane: Int, _ dist: Double) -> [O] {
-    let a = Double(lane) * 40 * Double.pi / 180
+    let a = Double(lane) * 30 * Double.pi / 180
     let d = Swift.max(dist, 0.6)
     return [.x(sin(a) * d), .z(-cos(a) * d)]
 }
@@ -152,15 +153,15 @@ func zGesture(_ g: ZGesture) {
         let next = zAim + (g == .turnRight ? 1 : -1)
         if next < -2 || next > 2 {
             // already at the edge
-            tone([.type("square"), .f(110), .dur(0.08), .gain(0.12), .x(Double(zAim) * 0.4), .z(-0.8)])
+            tone([.type("square"), .f(110), .dur(0.08), .gain(0.14)] + place(lane: zAim, 1.5))
             return
         }
         zAim = next
         // each lane has its own note, low on the left, high on the right, played from that side
-        tone([.type("triangle"), .f([262, 330, 392, 494, 587][zAim + 2]), .dur(0.08), .gain(0.16), .x(Double(zAim) * 0.45), .z(-0.8)])
+        tone([.type("triangle"), .f([262, 330, 392, 494, 587][zAim + 2]), .dur(0.08), .gain(0.2)] + place(lane: zAim, 1.5))
         if zAimHelp, let z = zZombies.filter({ zRel($0) == 0 }).min(by: { $0.dist < $1.dist }) {
             // a soft tick when one is right in front of you
-            tone([.type("sine"), .f(1400), .dur(0.04), .gain(0.12), .z(-0.5), .delay(0.07)])
+            tone([.type("sine"), .f(1400), .dur(0.04), .gain(0.15), .delay(0.07)] + place(lane: zAim, 1.5))
             var copy = z
             zSound(&copy)
             if let i = zZombies.firstIndex(where: { $0.id == z.id }) { zZombies[i].nextSound = copy.nextSound; zZombies[i].groanNext = copy.groanNext }
@@ -313,7 +314,7 @@ func zNewRun() {
 /* ---------- training ---------- */
 
 private let TRAIN: [String] = [
-    "Training. There are five lanes in front of you, and you're aiming at the center one. A zombie is in the center lane, chained to a post. It can't reach you. Tap to shoot it.",
+    "Training. There are five lanes in front of you. Listen: here they are, from far left to far right. You're aiming at the center one. A zombie is coming into the center lane, chained to a post. It can't reach you. Tap to shoot it.",
     "Got it. Your gun holds eight bullets. Swipe down to reload. Try it now.",
     "Good. The next one is in the far right lane. Swipe right twice: each swipe plays a higher note. You'll hear a soft tick when you're aiming at it. Then tap.",
     "Now one in the left lane. Swipe left until you hear the tick, then tap.",
@@ -330,7 +331,13 @@ private func zTrainSpawn(_ lane: Int) {
 private func zTrainShow() {
     let step = zTrain
     arena("Training", TRAIN[step])
-    if step == 0 { zTrainSpawn(0) }
+    if step == 0 {
+        // the five lanes, far left to far right, each from where its zombies will be
+        for l in -2...2 {
+            tone([.type("triangle"), .f([262, 330, 392, 494, 587][l + 2]), .dur(0.12), .gain(0.2), .delay(0.6 + Double(l + 2) * 0.55)] + place(lane: l, 1.5))
+        }
+        after(4000) { if zTrain == 0 { zTrainSpawn(0) } }
+    }
     if step == 2 { zTrainSpawn(2) }
     if step == 3 { zTrainSpawn(-1) }
 }
@@ -362,7 +369,7 @@ func registerZombies() {
         if !zTrained { choices.swapAt(0, 1) }
         choices += [
             Choice("Aim helper: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
-            Choice("Turn the screen when you hold the phone sideways: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
+            Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
             Choice("Back", to("title")),
         ]
         show("Last Stand", "You, a pistol, and the dark. They come in waves. You'll only hear them.\n\n" + HOWTO + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)

@@ -28,16 +28,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     static var mask: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask { AppDelegate.mask }
 
-    /// In the fight the screen follows the way you hold the phone, upright or sideways, so a swipe
-    /// to your left is always "left". It's never forced: a blind player can't see that the screen turned.
     static func sideways(_ on: Bool) {
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
-        let want: UIInterfaceOrientationMask = on ? .allButUpsideDown : .portrait
+        let want: UIInterfaceOrientationMask = on ? .landscape : .portrait
         guard want != mask else { return }
         mask = want
         for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
             scene.windows.first?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-            if !on { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in } }
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: on ? .landscape : .portrait)) { _ in }
         }
     }
 }
