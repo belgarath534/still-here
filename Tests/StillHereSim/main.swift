@@ -457,7 +457,7 @@ var currentRun = ""
     zGesture(.turnRight); zGesture(.shoot)
     try await waitFor("behind-left step") { zTrain == 3 && zZombies.count == 1 }
     for _ in 0..<3 { zGesture(.turnLeft) }
-    guard zRel(zZombies[0]) == 0 else { throw Failure(msg: "turning left three times didn't face it") }
+    guard zRel(zZombies[0]) == 0 else { throw Failure(msg: "three swipes left didn't aim at it") }
     zGesture(.shoot)
     try await waitFor("status step") { zTrain == 4 }
     zGesture(.status)
@@ -491,10 +491,35 @@ var currentRun = ""
     try await waitTitle("Overrun")
     guard screen.text.contains("wave 1"), screen.choices.map(\.label) == ["Try again", "Main menu"] else { throw Failure(msg: "end screen: " + screen.text) }
     try await click("Try again"); try await waitTitle("Wave 1")
-    guard zHealth == 3, zAmmo == CLIP, zKills == 0 else { throw Failure(msg: "a new run didn't start fresh") }
+    guard zHealth == MAXH, zAmmo == CLIP, zKills == 0 else { throw Failure(msg: "a new run didn't start fresh") }
     zRunning = false
     go("title"); try await waitTitle("Main menu")
     guard !screen.landscape else { throw Failure(msg: "the menu stayed sideways") }
+}
+
+/// A slow, clumsy player: one move every second and a half, and a third of swipes go the wrong way.
+/// Has to get through two waves, so the start is fair for someone still learning.
+@MainActor func zombieSlow() async throws {
+    try await waitTitle("Last Stand"); try await click("Start the fight")
+    while true {
+        if screen.title == "Overrun" { throw Failure(msg: "a slow player was overrun: " + screen.text) }
+        if screen.title.hasSuffix("cleared") {
+            if zWave == 2 { return }
+            try await click("Next wave"); continue
+        }
+        if zRunning {
+            if zAmmo == 0 { zGesture(.reload) }
+            else if let z = zZombies.min(by: { $0.dist < $1.dist }) {
+                let r = zRel(z)
+                if r == 0 { zGesture(.shoot) }
+                else {
+                    let right = r > 0
+                    zGesture((Math.random() < 0.33 ? !right : right) ? .turnRight : .turnLeft)
+                }
+            }
+        }
+        try await wait(1500)
+    }
 }
 
 /* ---------- runner ---------- */
@@ -509,7 +534,7 @@ let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
     ("ch13", "c13", ch13), ("ch14", "c14", ch14), ("ch15-keep", "c15", { try await ch15(true) }), ("ch15-burn", "c15", { try await ch15(false) }),
     ("ch16-delete", "c16", { try await ch16(true) }), ("ch16-echo", "c16", { try await ch16(false) }),
     ("endless", "e_start", endless), ("endless-death", "e_start", endlessDeath),
-    ("zombie-training", "x_start", zombieTraining), ("zombie-fight", "x_start", zombieFight), ("zombie-death", "x_start", zombieDeath),
+    ("zombie-training", "x_start", zombieTraining), ("zombie-fight", "x_start", zombieFight), ("zombie-death", "x_start", zombieDeath), ("zombie-slow", "x_start", zombieSlow),
 ]
 
 @MainActor func runAll() async {

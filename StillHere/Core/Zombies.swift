@@ -1,16 +1,16 @@
 import Foundation
 
 // Last Stand: a zombie survival mode played with gestures instead of buttons.
-// Zombies shuffle toward you from all around. Swipe left or right to turn until the groaning is
-// in the middle of your head, tap to shoot, swipe down to reload, swipe up to hear how you're doing.
-// Directions come in eight steps of 45 degrees, so "in the middle" is something you can hear.
+// Zombies shuffle toward you down five lanes: far left, left, center, right, far right.
+// Swipe left or right to move your aim one lane (a tone tells you which), tap to shoot,
+// swipe down to reload, swipe up to hear how you're doing.
 
 enum ZGesture { case turnLeft, turnRight, shoot, reload, status }
 
 struct Zombie {
     var id: Int
-    /// which of the eight directions it's in, 0 to 7, fixed in the world (0 is where you faced at the start)
-    var dir: Int
+    /// its lane, -2 (far left) to 2 (far right)
+    var lane: Int
     var dist: Double
     var speed: Double
     var hp: Int
@@ -20,9 +20,12 @@ struct Zombie {
 }
 
 let CLIP = 8
+/// bites you can take
+let MAXH = 5
 var zZombies: [Zombie] = []
+/// the lane you're aiming at, -2 to 2
 var zAim = 0
-var zAmmo = CLIP, zHealth = 3, zWave = 0, zKills = 0, zToSpawn = 0, zSpawnIn = 0.0
+var zAmmo = CLIP, zHealth = MAXH, zWave = 0, zKills = 0, zToSpawn = 0, zSpawnIn = 0.0
 var zReloading = false, zRunning = false, zShots = 0, zHits = 0
 var zSeq = 0
 /// the training round: which step you're on, -1 when not training
@@ -48,31 +51,29 @@ var zTrained: Bool {
 let Z_GROANS = 9
 let Z_SFX = (0..<Z_GROANS).map { "z_groan\($0)" } + (0..<6).map { "z_step\($0)" } +
     ["z_shuffle0", "z_shuffle1", "z_shot0", "z_shot1", "z_reload", "z_die0", "z_die1", "z_bite", "z_click"]
-/// You keep walking on your own, toward wherever you face. Metres per second.
-let WALK = 0.25
 var zStepIn = 0.0, zStepN = 0
 
 /* ---------- where things are ---------- */
 
-/// -4...3: 0 is straight ahead, positive to your right, 4 (shown as -4) behind you
-func zRel(_ z: Zombie) -> Int { ((z.dir - zAim) % 8 + 12) % 8 - 4 }
-private func place(_ rel: Int, _ dist: Double) -> [O] {
-    let a = Double(rel) * Double.pi / 4
+/// how many lanes to the right of your aim it is (negative: to the left)
+func zRel(_ z: Zombie) -> Int { z.lane - zAim }
+/// where a lane is: spread across the front, 40 degrees apart
+private func place(lane: Int, _ dist: Double) -> [O] {
+    let a = Double(lane) * 40 * Double.pi / 180
     let d = Swift.max(dist, 0.6)
     return [.x(sin(a) * d), .z(-cos(a) * d)]
 }
-func zDirName(_ rel: Int) -> String {
-    ["behind you", "behind you on the left", "on your left", "ahead on your left", "straight ahead", "ahead on your right", "on your right", "behind you on the right"][rel + 4]
-}
+let LANES = ["far left", "left", "center", "right", "far right"]
+func zLaneName(_ lane: Int) -> String { LANES[lane + 2] }
 func zDistName(_ d: Double) -> String { d < 2.5 ? "very close" : d < 5 ? "close" : "far" }
 
 private func zSound(_ z: inout Zombie) {
     let rate = z.kind == "brute" ? 0.8 : z.kind == "runner" ? 1.15 : 0.92 + Math.random() * 0.14
     let near = z.dist < 3
     if z.groanNext || near {
-        play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(zRel(z), z.dist) + [.rate(rate), .gain(z.kind == "brute" ? 1.6 : 1.3)])
+        play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(lane: z.lane, z.dist) + [.rate(rate), .gain(z.kind == "brute" ? 1.6 : 1.3)])
     } else {
-        play("z_shuffle" + str(Int(Math.random() * 2)), place(zRel(z), z.dist) + [.rate(rate), .gain(1.1)])
+        play("z_shuffle" + str(Int(Math.random() * 2)), place(lane: z.lane, z.dist) + [.rate(rate), .gain(1.1)])
     }
     z.groanNext.toggle()
     z.nextSound = (near ? 0.7 : 1.1) + Math.random() * 0.6
@@ -80,20 +81,23 @@ private func zSound(_ z: inout Zombie) {
 
 /* ---------- the fight ---------- */
 
-private func waveSize() -> Int { 4 + zWave * 2 }
-private func maxAtOnce() -> Int { Swift.min(1 + (zWave + 1) / 2, 5) }
+private func waveSize(_ w: Int = zWave) -> Int { 4 + (w - 1) * 2 }
+/// wave 1: one at a time; then a second, third and fourth join in slowly
+private func maxAtOnce() -> Int { Swift.min(1 + zWave / 2, 4) }
 private func speedScale() -> Double { (opts.extraTime ? 0.75 : 1) * (opts.hard ? 1.2 : 1) }
 
 private func spawnZombie() {
     zSeq += 1
-    // early waves come from in front and the sides; later ones from anywhere
-    let rel = zWave < 3 ? pick([-2, -1, 0, 1, 2]) : pick([-4, -3, -2, -1, 0, 1, 2, 3])
+    // a free lane if there is one
+    let used = Set(zZombies.map(\.lane))
+    let free = (-2...2).filter { !used.contains($0) }
+    let lane = pick(free.isEmpty ? Array(-2...2) : free)
     var kind = "walker"
-    if zWave >= 4 && Math.random() < 0.25 { kind = "runner" }
-    if zWave >= 3 && Math.random() < 0.2 { kind = "brute" }
-    let base = Swift.min(0.55 + Double(zWave) * 0.06, 1.2)
+    if zWave >= 5 && Math.random() < 0.25 { kind = "runner" }
+    if zWave >= 4 && Math.random() < 0.2 { kind = "brute" }
+    let base = Swift.min(0.4 + Double(zWave) * 0.05, 1.0)
     let speed = base * (kind == "runner" ? 1.6 : kind == "brute" ? 0.7 : 1) * speedScale()
-    var z = Zombie(id: zSeq, dir: ((zAim + rel) % 8 + 8) % 8, dist: 9 + Math.random() * 2, speed: speed, hp: kind == "brute" ? 2 : 1, kind: kind, nextSound: 0)
+    var z = Zombie(id: zSeq, lane: lane, dist: 12 + Math.random() * 2, speed: speed, hp: kind == "brute" ? 2 : 1, kind: kind, nextSound: 0)
     zSound(&z)
     zZombies.append(z)
     zToSpawn -= 1
@@ -105,7 +109,7 @@ func zTick(_ dt: Double) {
         zSpawnIn -= dt
         if zSpawnIn <= 0 {
             spawnZombie()
-            zSpawnIn = Swift.max(3.5 - Double(zWave) * 0.25, 1.5) + Math.random()
+            zSpawnIn = Swift.max(5 - Double(zWave) * 0.4, 2) + Math.random()
         }
     }
     // your own footsteps, under you
@@ -118,9 +122,7 @@ func zTick(_ dt: Double) {
         }
     }
     for i in zZombies.indices {
-        // walking toward one brings it closer faster; walking away buys time
-        let walk = zTrain < 0 ? WALK * cos(Double(zRel(zZombies[i])) * Double.pi / 4) : 0
-        zZombies[i].dist -= (zZombies[i].speed + walk) * dt
+        zZombies[i].dist -= zZombies[i].speed * dt
         zZombies[i].nextSound -= dt
         if zZombies[i].nextSound <= 0 { zSound(&zZombies[i]) }
     }
@@ -129,12 +131,12 @@ func zTick(_ dt: Double) {
 
 private func zBitten(_ i: Int) {
     let z = zZombies[i]
-    play("z_bite", place(zRel(z), 0.6) + [.gain(1.6)])
+    play("z_bite", place(lane: z.lane, 0.6) + [.gain(1.6)])
     audio.haptic("boom")
     view?.flash()
     zHealth -= 1
     // you shove it away; it comes back
-    zZombies[i].dist = 4
+    zZombies[i].dist = 6
     zZombies[i].nextSound = 1.5
     if zHealth <= 0 { zDie(); return }
     say(zHealth == 1 ? "Bitten. One hit left." : "Bitten. " + str(zHealth) + " hits left.")
@@ -145,8 +147,15 @@ func zGesture(_ g: ZGesture) {
     guard zRunning, !paused else { return }
     switch g {
     case .turnLeft, .turnRight:
-        zAim = (zAim + (g == .turnRight ? 1 : 7)) % 8
-        tone([.type("triangle"), .f(g == .turnRight ? 520 : 440), .dur(0.05), .gain(0.12), .z(-0.5)])
+        let next = zAim + (g == .turnRight ? 1 : -1)
+        if next < -2 || next > 2 {
+            // already at the edge
+            tone([.type("square"), .f(110), .dur(0.08), .gain(0.12), .x(Double(zAim) * 0.4), .z(-0.8)])
+            return
+        }
+        zAim = next
+        // each lane has its own note, low on the left, high on the right, played from that side
+        tone([.type("triangle"), .f([262, 330, 392, 494, 587][zAim + 2]), .dur(0.08), .gain(0.16), .x(Double(zAim) * 0.45), .z(-0.8)])
         if zAimHelp, let z = zZombies.filter({ zRel($0) == 0 }).min(by: { $0.dist < $1.dist }) {
             // a soft tick when one is right in front of you
             tone([.type("sine"), .f(1400), .dur(0.04), .gain(0.12), .z(-0.5), .delay(0.07)])
@@ -180,12 +189,12 @@ private func zShoot() {
         if z.hp <= 0 {
             zZombies.remove(at: i)
             zKills += 1
-            play("z_die" + str(Int(Math.random() * 2)), place(0, z.dist) + [.delay(0.12), .gain(1.4), .rate(z.kind == "brute" ? 0.85 : 1)])
+            play("z_die" + str(Int(Math.random() * 2)), place(lane: z.lane, z.dist) + [.delay(0.12), .gain(1.4), .rate(z.kind == "brute" ? 0.85 : 1)])
             zAfterKill()
         } else {
             zZombies[i] = z
             zZombies[i].dist += 1.2   // it staggers back
-            play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(0, z.dist + 1.2) + [.delay(0.15), .rate(0.75), .gain(1.6)])
+            play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(lane: z.lane, z.dist + 1.2) + [.delay(0.15), .rate(0.75), .gain(1.6)])
         }
     }
     if zAmmo == 0 { after(400) { if zRunning && zAmmo == 0 && !zReloading { say("Empty.") } } }
@@ -210,8 +219,9 @@ func zStatusLine(full: Bool) -> String {
         let left = zToSpawn + zZombies.count
         s += " Wave " + str(zWave) + ", " + str(left) + (left == 1 ? " zombie" : " zombies") + " left."
     }
-    if full, let z = zZombies.min(by: { $0.dist < $1.dist }) {
-        s += " Nearest: " + zDirName(zRel(z)) + ", " + zDistName(z.dist) + "."
+    if full {
+        s += " Aiming " + zLaneName(zAim) + "."
+        if let z = zZombies.min(by: { $0.dist < $1.dist }) { s += " Nearest: " + zLaneName(z.lane) + ", " + zDistName(z.dist) + "." }
     }
     return s
 }
@@ -229,7 +239,7 @@ private func zAfterKill() {
 
 /* ---------- waves ---------- */
 
-private let HOWTO = "You keep walking on your own, toward wherever you face. Swipe left or right to turn. Tap to shoot when the groaning is in the middle of your head. Swipe down to reload. Swipe up to hear your bullets, health and what's left. Two fingers double-tap to pause."
+private let HOWTO = "You walk forward on your own. Zombies come at you down five lanes: far left, left, center, right and far right. Swipe left or right to move your aim one lane; a note tells you where you're aiming, low on the left and high on the right. Tap to shoot. Swipe down to reload. Swipe up to hear your bullets, health and where they are. Two fingers double-tap to pause."
 
 private func arena(_ title: String, _ intro: String) {
     screen.landscape = zSideways
@@ -251,7 +261,7 @@ private func zStartWave() {
     music(zWave >= 4 ? "m_zfight2" : "m_zfight", 0.2, 3)
     wind(0.05)
     zStepIn = 1
-    arena("Wave " + str(zWave), "Wave " + str(zWave) + ". " + str(waveSize()) + " of them. " + (zWave == 1 ? "They're coming from in front of you and the sides." : zWave == 3 ? "From now on, they can come from behind you too." : "Listen."))
+    arena("Wave " + str(zWave), "Wave " + str(zWave) + ". " + str(waveSize()) + " of them. " + (zWave == 1 ? "One at a time. You're aiming at the center lane." : zWave == 2 ? "Now two at once." : zWave == 4 ? "Watch for big ones. They take two shots." : zWave == 5 ? "Some of them run." : "Listen."))
     spawn {
         while zRunning {
             try await wait(100)
@@ -265,10 +275,10 @@ private func zWaveCleared() {
     clearScene()
     if zWave > bestWave { bestWave = zWave }
     music("m_zrest", 0.22, 3)
-    let healed = zHealth < 3
-    zHealth = Swift.min(zHealth + 1, 3)
+    let healed = zHealth < MAXH
+    zHealth = Swift.min(zHealth + 1, MAXH)
     chime()
-    show("Wave " + str(zWave) + " cleared", "Silence. For now." + (healed ? " You catch your breath: " + str(zHealth) + " hits left." : "") + "\n\nWave " + str(zWave + 1) + " brings " + str(4 + (zWave + 1) * 2) + " of them, and they're faster.", [
+    show("Wave " + str(zWave) + " cleared", "Silence. For now." + (healed ? " You catch your breath: " + str(zHealth) + " hits left." : "") + "\n\nWave " + str(zWave + 1) + " brings " + str(waveSize(zWave + 1)) + " of them, a little faster.", [
         Choice("Next wave") { zStartWave() },
         Choice("Main menu", to("title")),
     ])
@@ -294,23 +304,23 @@ private func zDie() {
 }
 
 func zNewRun() {
-    zWave = 0; zKills = 0; zHealth = 3; zShots = 0; zHits = 0; zAim = 0; zTrain = -1
+    zWave = 0; zKills = 0; zHealth = MAXH; zShots = 0; zHits = 0; zAim = 0; zTrain = -1
     zStartWave()
 }
 
 /* ---------- training ---------- */
 
 private let TRAIN: [String] = [
-    "Training. A zombie is straight ahead, chained to a post. It can't reach you. Tap to shoot it.",
+    "Training. There are five lanes in front of you, and you're aiming at the center one. A zombie is in the center lane, chained to a post. It can't reach you. Tap to shoot it.",
     "Got it. Your gun holds eight bullets. Swipe down to reload. Try it now.",
-    "Good. The next one is on your right. Swipe right to turn toward it. When the groaning is in the middle of your head, tap.",
-    "Now one behind you on the left. Swipe left until it's in front of you. Listen for the soft tick: it means one is right ahead. Then tap.",
-    "Last thing. Swipe up any time to hear your bullets, your health, and where the nearest one is. Try it.",
+    "Good. The next one is in the far right lane. Swipe right twice: each swipe plays a higher note. You'll hear a soft tick when you're aiming at it. Then tap.",
+    "Now one in the left lane. Swipe left until you hear the tick, then tap.",
+    "Last thing. Swipe up any time to hear your bullets, your health, which lane you're aiming at and where the nearest one is. Try it.",
 ]
 
-private func zTrainSpawn(_ rel: Int) {
+private func zTrainSpawn(_ lane: Int) {
     zSeq += 1
-    var z = Zombie(id: zSeq, dir: ((zAim + rel) % 8 + 8) % 8, dist: 5, speed: 0, hp: 1, kind: "walker", nextSound: 0)
+    var z = Zombie(id: zSeq, lane: lane, dist: 5, speed: 0, hp: 1, kind: "walker", nextSound: 0)
     zSound(&z)
     zZombies = [z]
 }
@@ -320,7 +330,7 @@ private func zTrainShow() {
     arena("Training", TRAIN[step])
     if step == 0 { zTrainSpawn(0) }
     if step == 2 { zTrainSpawn(2) }
-    if step == 3 { zTrainSpawn(-3) }
+    if step == 3 { zTrainSpawn(-1) }
 }
 
 private func zTrainNext() {
@@ -331,7 +341,7 @@ private func zTrainNext() {
         zTrained = true
         clearScene()
         chime()
-        show("Training done", "That's everything. In a real fight they keep coming, more at once each wave, and if one reaches you it bites. Three bites and it's over.\n\nTwo fingers double-tap pauses the fight at any time.", [
+        show("Training done", "That's everything. In a real fight they keep coming, more at once each wave, and if one reaches you it bites. Five bites and it's over; you get one back after every wave you clear.\n\nTwo fingers double-tap pauses the fight at any time.", [
             Choice("Start the fight") { zNewRun() },
             Choice("Back", to("x_start")),
         ])
@@ -353,10 +363,10 @@ func registerZombies() {
             Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
             Choice("Back", to("title")),
         ]
-        show("Last Stand", "You, a pistol, and the dark. They come in waves, from every side. You'll only hear them.\n\n" + HOWTO + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)
+        show("Last Stand", "You, a pistol, and the dark. They come in waves. You'll only hear them.\n\n" + HOWTO + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)
     }
     scene("x_train") {
-        zWave = 0; zHealth = 3; zAmmo = CLIP; zAim = 0; zReloading = false; zZombies = []
+        zWave = 0; zHealth = MAXH; zAmmo = CLIP; zAim = 0; zReloading = false; zZombies = []
         zTrain = 0
         zRunning = true
         wind(0.04)
