@@ -16,6 +16,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var phase
     @Environment(\.horizontalSizeClass) private var sizeClass
     private var wide: Bool { sizeClass == .regular }
+    private var arena: Bool { model.screen.panel == .arena }
 
     var body: some View {
         ZStack {
@@ -38,7 +39,15 @@ struct ContentView: View {
             }
             .opacity(model.screen.dark ? 0.35 : 1)
             .animation(.easeInOut(duration: 3), value: model.screen.dark)
-            .accessibilityHidden(model.paused)
+            .accessibilityHidden(model.paused || arena)
+
+            // Last Stand: the whole screen takes swipes and taps
+            if arena && !model.paused {
+                GestureArea(label: "Fight area. " + model.screen.title,
+                            onGesture: { g in Task { @MainActor in zGesture(g) } },
+                            onPause: { model.togglePause() })
+                    .ignoresSafeArea()
+            }
 
             if model.screen.mode == .game && !model.paused {
                 VStack {
@@ -86,6 +95,8 @@ struct ContentView: View {
     /// Every scene is a brand-new element, so moving VoiceOver to it reads it out,
     /// even when the previous scene's text was focused.
     private func focusNarration() {
+        // the fight area moves VoiceOver to itself when it appears
+        if arena { return }
         narrationFocused = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             UIAccessibility.post(notification: .screenChanged, argument: nil)

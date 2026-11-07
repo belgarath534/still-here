@@ -16,7 +16,7 @@ struct Choice {
     let act: @MainActor () async throws -> Void
     init(_ label: String, _ act: @escaping @MainActor () async throws -> Void) { self.label = label; self.act = act }
 }
-enum Panel { case settings }
+enum Panel { case settings, arena }
 enum Mode { case splash, menu, game }
 struct Screen {
     var id = 0
@@ -289,6 +289,7 @@ let CH_SFX: [String: [String]] = [
   "c15": ["a15_call","a15_doors","a15_danny","a15_keep","a15_letgo","a15_cr","c6_girl","c6_dj2","c6_walter1"],
   "c16": ["a16_plan","a16_tower","a16_beg","a16_forget","a16_who","a16_say","a16_there","a16_ruizend","a16_news","a13_asst","a15_danny","c8_alv1","c11_cr"],
   "tapes": ["t1","t2","t3","t4"],
+  "x": Z_SFX,
 ]
 var chLoaded: Set<String> = []
 var bootLoaded = false
@@ -296,6 +297,7 @@ func chapterKey(_ id: String) -> String? {
     if id.hasPrefix("c"), let n = Int(id.dropFirst().prefix(while: { $0.isNumber })), n >= 6 { return "c\(n)" }
     if id.hasPrefix("z") { return "z" }
     if id == "tapes" { return "tapes" }
+    if id.hasPrefix("x_") { return "x" }
     return nil
 }
 @MainActor func loadChapter(_ key: String) async -> Bool {

@@ -199,5 +199,17 @@
 "unlock": 0.496,
 "vent0": 0.183,
 "vent1": 0.183,
-"vent2": 0.235
+"vent2": 0.235,
+"z_bite": 1.646,
+"z_click": 0.287,
+"z_die0": 1.933,
+"z_die1": 1.933,
+"z_groan0": 2.038,
+"z_groan1": 1.75,
+"z_groan2": 2.247,
+"z_groan3": 1.541,
+"z_reload": 1.541,
+"z_shot": 1.149,
+"z_shuffle0": 1.541,
+"z_shuffle1": 1.541
 }

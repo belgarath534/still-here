@@ -26,6 +26,7 @@ func startGame() {
     registerMenus()
     registerStory()
     registerEndless()
+    registerZombies()
     go("splash")
 }
 
@@ -98,6 +99,7 @@ func registerMenus() {
         choices += [
             Choice("New game") { try await start("s1") },
             Choice("Endless Night: survival mode" + (bestNight > 0 ? ", best " + str(bestNight) : "")) { try await start("e_start") },
+            Choice("Last Stand: zombie survival" + (bestWave > 0 ? ", best wave " + str(bestWave) : "")) { try await start("x_start") },
             Choice("Chapters", to("chapters")),
             Choice("Settings", to("settings")),
             Choice("Endings found: " + str(endings.length) + " of " + str(ENDINGS.length), to("endings")),
@@ -136,7 +138,7 @@ func registerMenus() {
 
     scene("howto") {
         menuMusic()
-        show("How to play", "Wear headphones. Almost everything in Still Here happens through sound, and sounds come from your left, your right, in front of you, behind you and above you.\n\nEach scene's text is read to you when it appears. Then swipe right to reach the choices, and double-tap one to choose it.\n\nWhen the game says Listen, stop and listen. Something is about to happen.\n\nSome moments are timed: you'll need to tell which side a sound came from. You can turn on extra time in Settings.\n\nSometimes the right move is to do nothing at all. If the game tells you not to touch anything, don't.\n\nTo pause, use the Pause button at the top of the screen, or double-tap anywhere with two fingers. Pausing freezes everything, even timed moments. If you leave the app, the game pauses by itself.\n\nIf you die, you go back to the last checkpoint. The main menu can always continue from where you stopped.", [
+        show("How to play", "Wear headphones. Almost everything in Still Here happens through sound, and sounds come from your left, your right, in front of you, behind you and above you.\n\nEach scene's text is read to you when it appears. Then swipe right to reach the choices, and double-tap one to choose it.\n\nWhen the game says Listen, stop and listen. Something is about to happen.\n\nSome moments are timed: you'll need to tell which side a sound came from. You can turn on extra time in Settings.\n\nSometimes the right move is to do nothing at all. If the game tells you not to touch anything, don't.\n\nTo pause, use the Pause button at the top of the screen, or double-tap anywhere with two fingers. Pausing freezes everything, even timed moments. If you leave the app, the game pauses by itself.\n\nIf you die, you go back to the last checkpoint. The main menu can always continue from where you stopped.\n\nLast Stand, the zombie mode, is played with gestures instead of buttons: swipe left or right to turn, tap to shoot, swipe down to reload, swipe up to hear how you are doing. With VoiceOver on, the fight area takes your touches directly. Start with its training.", [
             Choice("Back", to("title")),
         ])
     }

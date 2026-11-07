@@ -432,6 +432,65 @@ var currentRun = ""
     try await click("Try again"); try await waitTitle("Endless Night")
 }
 
+/* ---------- Last Stand ---------- */
+
+/// Turns toward the nearest zombie and shoots, like a player who can hear well.
+@MainActor func fightStep() {
+    if zAmmo == 0 { if !zReloading { zGesture(.reload) }; return }
+    guard let z = zZombies.min(by: { $0.dist < $1.dist }) else { return }
+    let r = zRel(z)
+    if r == 0 { zGesture(.shoot) } else { zGesture(r > 0 ? .turnRight : .turnLeft) }
+}
+
+/// The training round, step by step.
+@MainActor func zombieTraining() async throws {
+    try await waitTitle("Last Stand"); try await click("Training")
+    try await waitFor("training step 1") { screen.title == "Training" && zZombies.count == 1 }
+    zGesture(.shoot)
+    try await waitFor("reload step") { zTrain == 1 && screen.title == "Training" }
+    zGesture(.reload)
+    try await waitFor("right step") { zTrain == 2 && zZombies.count == 1 }
+    guard zRel(zZombies[0]) == 2 else { throw Failure(msg: "the right-hand zombie is at \(zRel(zZombies[0]))") }
+    zGesture(.turnRight); zGesture(.shoot)
+    guard zZombies.count == 1 else { throw Failure(msg: "a shot that wasn't aimed hit anyway") }
+    zGesture(.turnRight); zGesture(.shoot)
+    try await waitFor("behind-left step") { zTrain == 3 && zZombies.count == 1 }
+    for _ in 0..<3 { zGesture(.turnLeft) }
+    guard zRel(zZombies[0]) == 0 else { throw Failure(msg: "turning left three times didn't face it") }
+    zGesture(.shoot)
+    try await waitFor("status step") { zTrain == 4 }
+    zGesture(.status)
+    try await waitTitle("Training done")
+    guard zTrained else { throw Failure(msg: "training not remembered") }
+    try await click("Start the fight"); try await waitTitle("Wave 1")
+}
+
+/// Three waves, played by a bot that aims by ear.
+@MainActor func zombieFight() async throws {
+    bestWave = 0
+    try await waitTitle("Last Stand"); try await click("Start the fight")
+    while true {
+        if screen.title == "Overrun" { throw Failure(msg: "overrun: " + screen.text) }
+        if screen.title.hasSuffix("cleared") {
+            if zWave == 3 { guard bestWave == 3 else { throw Failure(msg: "best wave not saved") }; return }
+            try await click("Next wave"); continue
+        }
+        if zRunning { fightStep() }
+        try await wait(300)
+    }
+}
+
+/// Doing nothing: they get you, and the end screen has a way out.
+@MainActor func zombieDeath() async throws {
+    try await waitTitle("Last Stand"); try await click("Start the fight")
+    try await waitTitle("Overrun")
+    guard screen.text.contains("wave 1"), screen.choices.map(\.label) == ["Try again", "Main menu"] else { throw Failure(msg: "end screen: " + screen.text) }
+    try await click("Try again"); try await waitTitle("Wave 1")
+    guard zHealth == 3, zAmmo == CLIP, zKills == 0 else { throw Failure(msg: "a new run didn't start fresh") }
+    zRunning = false
+    go("title"); try await waitTitle("Main menu")
+}
+
 /* ---------- runner ---------- */
 
 let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
@@ -444,6 +503,7 @@ let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
     ("ch13", "c13", ch13), ("ch14", "c14", ch14), ("ch15-keep", "c15", { try await ch15(true) }), ("ch15-burn", "c15", { try await ch15(false) }),
     ("ch16-delete", "c16", { try await ch16(true) }), ("ch16-echo", "c16", { try await ch16(false) }),
     ("endless", "e_start", endless), ("endless-death", "e_start", endlessDeath),
+    ("zombie-training", "x_start", zombieTraining), ("zombie-fight", "x_start", zombieFight), ("zombie-death", "x_start", zombieDeath),
 ]
 
 @MainActor func runAll() async {
