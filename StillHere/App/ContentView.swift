@@ -76,6 +76,7 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .onChange(of: model.screen.id) { focusNarration() }
+        .onChange(of: model.screen.landscape) { AppDelegate.sideways(model.screen.landscape) }
         .onChange(of: model.paused) {
             if model.paused { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { pauseFocused = true } }
             else { focusNarration() }

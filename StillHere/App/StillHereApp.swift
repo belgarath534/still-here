@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 @main
 struct StillHereApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model: GameModel
 
     init() {
@@ -17,6 +19,23 @@ struct StillHereApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
+        }
+    }
+}
+
+/// Upright everywhere on iPhone, except the Last Stand fight, which turns sideways.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    static var mask: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask { AppDelegate.mask }
+
+    static func sideways(_ on: Bool) {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+        let want: UIInterfaceOrientationMask = on ? .landscape : .portrait
+        guard want != mask else { return }
+        mask = want
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            scene.windows.first?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: on ? .landscapeRight : .portrait)) { _ in }
         }
     }
 }

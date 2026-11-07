@@ -26,6 +26,8 @@ struct Screen {
     var panel: Panel? = nil
     var mode = Mode.splash
     var dark = false
+    /// iPhone only: turn the screen sideways (the Last Stand fight)
+    var landscape = false
 }
 protocol GameView: AnyObject {
     func render(_ s: Screen)
@@ -222,6 +224,7 @@ func go(_ target: String?) {
         UserDefaults.standard.set(id, forKey: "stillhere-checkpoint")
     }
     screen.dark = false
+    screen.landscape = false
     screen.mode = id == "splash" ? .splash : MENUS.contains(id) ? .menu : .game
     spawn(s.fn)
     if !MENUS.contains(id) && !QUIET.contains(id) {

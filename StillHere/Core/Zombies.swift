@@ -35,6 +35,11 @@ var bestWave: Int {
     get { UserDefaults.standard.integer(forKey: "stillhere-bestwave") }
     set { UserDefaults.standard.set(newValue, forKey: "stillhere-bestwave") }
 }
+/// turn the iPhone sideways for the fight
+var zSideways: Bool {
+    get { UserDefaults.standard.object(forKey: "stillhere-zsideways") as? Bool ?? true }
+    set { UserDefaults.standard.set(newValue, forKey: "stillhere-zsideways") }
+}
 var zTrained: Bool {
     get { UserDefaults.standard.bool(forKey: "stillhere-ztrained") }
     set { UserDefaults.standard.set(newValue, forKey: "stillhere-ztrained") }
@@ -227,6 +232,7 @@ private func zAfterKill() {
 private let HOWTO = "You keep walking on your own, toward wherever you face. Swipe left or right to turn. Tap to shoot when the groaning is in the middle of your head. Swipe down to reload. Swipe up to hear your bullets, health and what's left. Two fingers double-tap to pause."
 
 private func arena(_ title: String, _ intro: String) {
+    screen.landscape = zSideways
     show(title, intro, [], .arena)
     screen.mode = .game
     screen.text = zStatusLine(full: false)
@@ -344,6 +350,7 @@ func registerZombies() {
         if !zTrained { choices.swapAt(0, 1) }
         choices += [
             Choice("Aim helper: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
+            Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
             Choice("Back", to("title")),
         ]
         show("Last Stand", "You, a pistol, and the dark. They come in waves, from every side. You'll only hear them.\n\n" + HOWTO + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)

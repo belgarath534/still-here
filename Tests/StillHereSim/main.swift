@@ -446,6 +446,7 @@ var currentRun = ""
 @MainActor func zombieTraining() async throws {
     try await waitTitle("Last Stand"); try await click("Training")
     try await waitFor("training step 1") { screen.title == "Training" && zZombies.count == 1 }
+    guard screen.landscape else { throw Failure(msg: "the fight didn't turn sideways") }
     zGesture(.shoot)
     try await waitFor("reload step") { zTrain == 1 && screen.title == "Training" }
     zGesture(.reload)
@@ -493,6 +494,7 @@ var currentRun = ""
     guard zHealth == 3, zAmmo == CLIP, zKills == 0 else { throw Failure(msg: "a new run didn't start fresh") }
     zRunning = false
     go("title"); try await waitTitle("Main menu")
+    guard !screen.landscape else { throw Failure(msg: "the menu stayed sideways") }
 }
 
 /* ---------- runner ---------- */
