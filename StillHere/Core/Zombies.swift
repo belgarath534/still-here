@@ -65,15 +65,15 @@ private func place(lane: Int, _ dist: Double) -> [O] {
 }
 let LANES = ["far left", "left", "center", "right", "far right"]
 func zLaneName(_ lane: Int) -> String { LANES[lane + 2] }
-func zDistName(_ d: Double) -> String { d < 2.5 ? "very close" : d < 5 ? "close" : "far" }
+func zDistName(_ d: Double) -> String { d < 2 ? "very close" : d < 4.5 ? "close" : "far" }
 
 private func zSound(_ z: inout Zombie) {
     let rate = z.kind == "brute" ? 0.8 : z.kind == "runner" ? 1.15 : 0.92 + Math.random() * 0.14
     let near = z.dist < 3
     if z.groanNext || near {
-        play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(lane: z.lane, z.dist) + [.rate(rate), .gain(z.kind == "brute" ? 1.6 : 1.3)])
+        play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(lane: z.lane, z.dist) + [.rate(rate), .gain(z.kind == "brute" ? 2.3 : 2.0)])
     } else {
-        play("z_shuffle" + str(Int(Math.random() * 2)), place(lane: z.lane, z.dist) + [.rate(rate), .gain(1.1)])
+        play("z_shuffle" + str(Int(Math.random() * 2)), place(lane: z.lane, z.dist) + [.rate(rate), .gain(1.6)])
     }
     z.groanNext.toggle()
     z.nextSound = (near ? 0.7 : 1.1) + Math.random() * 0.6
@@ -95,12 +95,14 @@ private func spawnZombie() {
     var kind = "walker"
     if zWave >= 5 && Math.random() < 0.25 { kind = "runner" }
     if zWave >= 4 && Math.random() < 0.2 { kind = "brute" }
-    let base = Swift.min(0.4 + Double(zWave) * 0.05, 1.0)
+    let base = Swift.min(0.27 + Double(zWave) * 0.04, 0.8)
     let speed = base * (kind == "runner" ? 1.6 : kind == "brute" ? 0.7 : 1) * speedScale()
-    var z = Zombie(id: zSeq, lane: lane, dist: 12 + Math.random() * 2, speed: speed, hp: kind == "brute" ? 2 : 1, kind: kind, nextSound: 0)
+    var z = Zombie(id: zSeq, lane: lane, dist: 8 + Math.random() * 1.5, speed: speed, hp: kind == "brute" ? 2 : 1, kind: kind, nextSound: 0)
     zSound(&z)
     zZombies.append(z)
     zToSpawn -= 1
+    // early on, say where each new one is, so you learn what the lanes sound like
+    if zWave <= 2 { say("Zombie, " + zLaneName(lane) + ".") }
 }
 
 /// One tenth of a second of the fight.
@@ -117,7 +119,7 @@ func zTick(_ dt: Double) {
         zStepIn -= dt
         if zStepIn <= 0 {
             zStepN += 1
-            play("z_step" + str(Int(Math.random() * 6)), [.x(zStepN % 2 == 0 ? -0.15 : 0.15), .y(-1.4), .z(0), .gain(0.55), .rate(0.95 + Math.random() * 0.1)])
+            play("z_step" + str(Int(Math.random() * 6)), [.x(zStepN % 2 == 0 ? -0.15 : 0.15), .y(-1.4), .z(0), .gain(0.4), .rate(0.95 + Math.random() * 0.1)])
             zStepIn = 0.62
         }
     }
@@ -136,7 +138,7 @@ private func zBitten(_ i: Int) {
     view?.flash()
     zHealth -= 1
     // you shove it away; it comes back
-    zZombies[i].dist = 6
+    zZombies[i].dist = 5
     zZombies[i].nextSound = 1.5
     if zHealth <= 0 { zDie(); return }
     say(zHealth == 1 ? "Bitten. One hit left." : "Bitten. " + str(zHealth) + " hits left.")
@@ -360,7 +362,7 @@ func registerZombies() {
         if !zTrained { choices.swapAt(0, 1) }
         choices += [
             Choice("Aim helper: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
-            Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
+            Choice("Turn the screen when you hold the phone sideways: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
             Choice("Back", to("title")),
         ]
         show("Last Stand", "You, a pistol, and the dark. They come in waves. You'll only hear them.\n\n" + HOWTO + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)
