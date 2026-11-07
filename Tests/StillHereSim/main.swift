@@ -504,7 +504,7 @@ var currentRun = ""
     while true {
         if screen.title == "Overrun" { throw Failure(msg: "a slow player was overrun: " + screen.text) }
         if screen.title.hasSuffix("cleared") {
-            if zWave == 2 { return }
+            if zWave == 4 { return }
             try await click("Next wave"); continue
         }
         if zRunning {

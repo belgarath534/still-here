@@ -17,6 +17,8 @@ struct Zombie {
     var kind: String          // walker, runner, brute
     var nextSound: Double     // seconds until it groans or shuffles again
     var groanNext = true
+    /// already warned that it's close
+    var warned = false
 }
 
 let CLIP = 8
@@ -51,7 +53,12 @@ var zTrained: Bool {
 let Z_GROANS = 9
 let Z_SFX = (0..<Z_GROANS).map { "z_groan\($0)" } + (0..<6).map { "z_step\($0)" } +
     ["z_shuffle0", "z_shuffle1", "z_shot0", "z_shot1", "z_reload", "z_die0", "z_die1", "z_bite", "z_click"]
-var zStepIn = 0.0, zStepN = 0
+var zStepIn = 0.0, zStepN = 0, zTickIn = 0.0
+/// say where each new zombie is, and warn when one gets close
+var zCallouts: Bool {
+    get { UserDefaults.standard.object(forKey: "stillhere-zcallouts") as? Bool ?? true }
+    set { UserDefaults.standard.set(newValue, forKey: "stillhere-zcallouts") }
+}
 
 /* ---------- where things are ---------- */
 
@@ -103,7 +110,7 @@ private func spawnZombie() {
     zZombies.append(z)
     zToSpawn -= 1
     // early on, say where each new one is, so you learn what the lanes sound like
-    if zWave <= 2 { say("Zombie, " + zLaneName(lane) + ".") }
+    if zCallouts { say("Zombie, " + zLaneName(lane) + ".") }
 }
 
 /// One tenth of a second of the fight.
@@ -124,8 +131,22 @@ func zTick(_ dt: Double) {
             zStepIn = 0.62
         }
     }
+    // aim helper: a soft tick, over and over, while one is in the lane you're aiming at
+    if zAimHelp {
+        zTickIn -= dt
+        if zTickIn <= 0 {
+            zTickIn = 0.7
+            if zZombies.contains(where: { zRel($0) == 0 }) {
+                tone([.type("sine"), .f(1400), .dur(0.04), .gain(0.15)] + place(lane: zAim, 1.5))
+            }
+        }
+    }
     for i in zZombies.indices {
         zZombies[i].dist -= zZombies[i].speed * dt
+        if zCallouts && !zZombies[i].warned && zZombies[i].dist < 3 && zTrain < 0 {
+            zZombies[i].warned = true
+            say("Close, " + zLaneName(zZombies[i].lane) + "!")
+        }
         zZombies[i].nextSound -= dt
         if zZombies[i].nextSound <= 0 { zSound(&zZombies[i]) }
     }
@@ -140,6 +161,7 @@ private func zBitten(_ i: Int) {
     zHealth -= 1
     // you shove it away; it comes back
     zZombies[i].dist = 5
+    zZombies[i].warned = false
     zZombies[i].nextSound = 1.5
     if zHealth <= 0 { zDie(); return }
     say(zHealth == 1 ? "Bitten. One hit left." : "Bitten. " + str(zHealth) + " hits left.")
@@ -317,7 +339,7 @@ private let TRAIN: [String] = [
     "Training. There are five lanes in front of you. Listen: here they are, from far left to far right. You're aiming at the center one. A zombie is coming into the center lane, chained to a post. It can't reach you. Tap to shoot it.",
     "Got it. Your gun holds eight bullets. Swipe down to reload. Try it now.",
     "Good. The next one is in the far right lane. Swipe right twice: each swipe plays a higher note. You'll hear a soft tick when you're aiming at it. Then tap.",
-    "Now one in the left lane. Swipe left until you hear the tick, then tap.",
+    "Now one in the left lane. Swipe left until you hear ticking: it ticks for as long as you're aimed at one. Then tap.",
     "Last thing. Swipe up any time to hear your bullets, your health, which lane you're aiming at and where the nearest one is. Try it.",
 ]
 
@@ -368,7 +390,8 @@ func registerZombies() {
         var choices = [Choice("Start the fight") { zNewRun() }, Choice("Training") { go("x_train") }]
         if !zTrained { choices.swapAt(0, 1) }
         choices += [
-            Choice("Aim helper: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
+            Choice("Aim helper, ticking while you're aimed at one: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
+            Choice("Call out where they are: " + (zCallouts ? "on" : "off")) { zCallouts.toggle(); go("x_start") },
             Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
             Choice("Back", to("title")),
         ]
