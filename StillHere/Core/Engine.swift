@@ -6,6 +6,9 @@ import Foundation
 var audio: AudioBackend = SilentAudio()
 /// The screen. The app's SwiftUI model registers itself here.
 weak var view: GameView?
+/// Where players send problems and ideas. The app plugs in opening a new email; tests leave it out.
+let FEEDBACK_EMAIL = "support@dungen-descent.org"
+var onFeedback: (() -> Void)? = nil
 /// Tests run the game faster than real time.
 var timeScale = 1.0
 

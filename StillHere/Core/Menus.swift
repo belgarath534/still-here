@@ -105,6 +105,9 @@ func registerMenus() {
             Choice("Endings found: " + str(endings.length) + " of " + str(ENDINGS.length), to("endings")),
             Choice("Hidden tapes: " + str(tapesFound.length) + " of 4", to("tapes")),
             Choice("How to play", to("howto")),
+            Choice("Send feedback") {
+                if let f = onFeedback { f() } else { say("Email " + FEEDBACK_EMAIL) }
+            },
             Choice("Credits", to("credits")),
         ]
         show("Main menu", "Sixteen chapters and two interludes, four or five hours in all. Things change a little every time you play.", choices)

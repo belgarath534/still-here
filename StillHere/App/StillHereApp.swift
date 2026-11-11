@@ -12,6 +12,7 @@ struct StillHereApp: App {
         view = m
         audio = AVBackend()
         startGame()
+        onFeedback = openFeedbackEmail
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-shot"), i + 1 < args.count { screenshotScene(args[i + 1]) }
     }
@@ -38,6 +39,26 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: on ? .landscape : .portrait)) { _ in }
         }
     }
+}
+
+/// A new email to us, with the app and iOS version filled in. Without a mail app, the address is copied instead.
+@MainActor func openFeedbackEmail() {
+    let app = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?"
+    let build = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "?"
+    var c = URLComponents()
+    c.scheme = "mailto"
+    c.path = FEEDBACK_EMAIL
+    c.queryItems = [
+        URLQueryItem(name: "subject", value: "Still Here feedback"),
+        URLQueryItem(name: "body", value: "\n\n\nStill Here \(app) (\(build)), \(UIDevice.current.model), iOS \(UIDevice.current.systemVersion)"),
+    ]
+    // no canOpenURL check: iOS answers "no" for mailto unless the app declares it, so just try
+    guard let url = c.url else { copyFeedbackAddress(); return }
+    UIApplication.shared.open(url) { ok in if !ok { Task { @MainActor in copyFeedbackAddress() } } }
+}
+@MainActor private func copyFeedbackAddress() {
+    UIPasteboard.general.string = FEEDBACK_EMAIL
+    say("No mail app found. The address " + FEEDBACK_EMAIL + " is copied, so you can paste it into any email app.")
 }
 
 /// For App Store screenshots: `-shot NAME` opens a scene straight away.

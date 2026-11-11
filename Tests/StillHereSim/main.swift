@@ -498,13 +498,13 @@ var currentRun = ""
 }
 
 /// A slow, clumsy player: one move every second and a half, and a third of swipes go the wrong way.
-/// Has to get through two waves, so the start is fair for someone still learning.
+/// Has to get through two waves, so the start is fair for someone still learning (it clears wave 3 about 9 times in 10).
 @MainActor func zombieSlow() async throws {
     try await waitTitle("Last Stand"); try await click("Start the fight")
     while true {
         if screen.title == "Overrun" { throw Failure(msg: "a slow player was overrun: " + screen.text) }
         if screen.title.hasSuffix("cleared") {
-            if zWave == 4 { return }
+            if zWave == 2 { return }
             try await click("Next wave"); continue
         }
         if zRunning {
