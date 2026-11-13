@@ -60,6 +60,57 @@ var zCallouts: Bool {
     set { UserDefaults.standard.set(newValue, forKey: "stillhere-zcallouts") }
 }
 
+/* ---------- the game's own voice ---------- */
+// With a game voice on, players can mute VoiceOver (three-finger double-tap) during the fight and still
+// hear everything: the game speaks its own callouts, warnings and status. Joe and Kristin are
+// recorded clips (tools/make_voices.py); "iphone" uses the phone's own speech; "voiceover" speaks
+// through VoiceOver, as before.
+
+let ZVOICES = ["joe", "kristin", "iphone", "voiceover"]
+let ZVOICE_NAMES = ["joe": "Joe", "kristin": "Kristin", "iphone": "the iPhone's own voice", "voiceover": "VoiceOver only"]
+var zVoice: String {
+    get { UserDefaults.standard.string(forKey: "stillhere-zvoice").flatMap { ZVOICES.contains($0) ? $0 : nil } ?? "joe" }
+    set { UserDefaults.standard.set(newValue, forKey: "stillhere-zvoice") }
+}
+/// the iPhone's own voice; the app plugs it in. `urgent` cuts off whatever it was saying.
+var onSpeak: ((String, Bool) -> Void)? = nil
+/// every line a recorded voice knows (tools/zvoice_phrases.json)
+let ZV_KEYS: [String] = ["farleft", "left", "center", "right", "farright"].flatMap { ["new_" + $0, "close_" + $0, "lane_" + $0] }
+    + (0...60).map { "n\($0)" }
+    + ["bullets", "bullet", "hitsleft", "hitleft", "wave", "zombiesleft", "zombieleft", "aiming", "nearest", "veryclose", "close", "far",
+       "ofthem", "cleared", "empty", "emptyshort", "full", "bitten", "overrun", "intro1", "intro2", "intro4", "intro5", "listen",
+       "tip_mute", "tip_unmute", "hello", "train0", "train1", "train2", "train3", "train4", "traindone"]
+func zvRecorded(_ v: String) -> Bool { v == "joe" || v == "kristin" }
+func zvClips(_ v: String) -> [String] { zvRecorded(v) ? ZV_KEYS.map { "zv_\(v)_\($0)" } : [] }
+let LANE_KEYS = ["farleft", "left", "center", "right", "farright"]
+func zN(_ n: Int) -> String { "n\(Swift.min(Swift.max(n, 0), 60))" }
+
+private var zvQueue: [String] = []
+private var zvPlaying = false
+/// whether the player has heard the "mute VoiceOver" tip in this visit to Last Stand
+var zTipGiven = false
+
+/// Says something in the chosen voice. `keys` are recorded clips joined together; `text` is the same in words.
+func zSpeak(_ keys: [String], _ text: String, urgent: Bool = false) {
+    let v = zVoice
+    if v == "voiceover" { say(text); return }
+    if v == "iphone" { if let f = onSpeak { f(text, urgent) } else { say(text) }; return }
+    if urgent { zvQueue.removeAll() }
+    zvQueue += keys.map { "zv_\(v)_\($0)" }
+    guard !zvPlaying else { return }
+    zvPlaying = true
+    spawn {
+        defer { zvPlaying = false }
+        while !zvQueue.isEmpty {
+            let c = zvQueue.removeFirst()
+            play(c, [.z(-0.5), .gain(1.5)])
+            try await wait(len(c) + 30)
+        }
+    }
+}
+/// how long a line will take to say, so sounds can wait for it
+func zSpeakLength(_ keys: [String]) -> Double { zvRecorded(zVoice) ? keys.reduce(0) { $0 + len("zv_\(zVoice)_\($1)") + 30 } : 0 }
+
 /* ---------- where things are ---------- */
 
 /// how many lanes to the right of your aim it is (negative: to the left)
@@ -110,7 +161,7 @@ private func spawnZombie() {
     zZombies.append(z)
     zToSpawn -= 1
     // early on, say where each new one is, so you learn what the lanes sound like
-    if zCallouts { say("Zombie, " + zLaneName(lane) + ".") }
+    if zCallouts { zSpeak(["new_" + LANE_KEYS[lane + 2]], "Zombie, " + zLaneName(lane) + ".") }
 }
 
 /// One tenth of a second of the fight.
@@ -145,7 +196,7 @@ func zTick(_ dt: Double) {
         zZombies[i].dist -= zZombies[i].speed * dt
         if zCallouts && !zZombies[i].warned && zZombies[i].dist < 3 && zTrain < 0 {
             zZombies[i].warned = true
-            say("Close, " + zLaneName(zZombies[i].lane) + "!")
+            zSpeak(["close_" + LANE_KEYS[zZombies[i].lane + 2]], "Close, " + zLaneName(zZombies[i].lane) + "!", urgent: true)
         }
         zZombies[i].nextSound -= dt
         if zZombies[i].nextSound <= 0 { zSound(&zZombies[i]) }
@@ -164,12 +215,19 @@ private func zBitten(_ i: Int) {
     zZombies[i].warned = false
     zZombies[i].nextSound = 1.5
     if zHealth <= 0 { zDie(); return }
-    say(zHealth == 1 ? "Bitten. One hit left." : "Bitten. " + str(zHealth) + " hits left.")
+    zSpeak(["bitten", zN(zHealth), zHealth == 1 ? "hitleft" : "hitsleft"], zHealth == 1 ? "Bitten. One hit left." : "Bitten. " + str(zHealth) + " hits left.", urgent: true)
     zStatusText()
 }
 
 func zGesture(_ g: ZGesture) {
-    guard zRunning, !paused else { return }
+    guard !paused else { return }
+    // resting between waves (with a game voice): tap for the next wave, swipe up to hear how you're doing
+    if zResting {
+        if g == .shoot { zResting = false; if zTrain == -2 { zTrain = -1; zNewRun() } else { zStartWave() } }
+        if g == .status { zSpeak(zStatusKeys(), zStatusLine(full: false), urgent: true) }
+        return
+    }
+    guard zRunning else { return }
     switch g {
     case .turnLeft, .turnRight:
         let next = zAim + (g == .turnRight ? 1 : -1)
@@ -191,7 +249,7 @@ func zGesture(_ g: ZGesture) {
     case .shoot: zShoot()
     case .reload: zReload()
     case .status:
-        say(zStatusLine(full: true))
+        zSpeak(zStatusKeys(), zStatusLine(full: true), urgent: true)
         if zTrain == 4 { zTrainNext() }
     }
 }
@@ -200,7 +258,7 @@ private func zShoot() {
     if zReloading { return }
     if zAmmo == 0 {
         play("z_click", [.z(-0.4), .gain(1.4)])
-        say("Empty. Swipe down to reload.")
+        zSpeak(["empty"], "Empty. Swipe down to reload.", urgent: true)
         return
     }
     zAmmo -= 1
@@ -222,12 +280,12 @@ private func zShoot() {
             play("z_groan" + str(Int(Math.random() * Double(Z_GROANS))), place(lane: z.lane, z.dist + 1.2) + [.delay(0.15), .rate(0.75), .gain(1.6)])
         }
     }
-    if zAmmo == 0 { after(400) { if zRunning && zAmmo == 0 && !zReloading { say("Empty.") } } }
+    if zAmmo == 0 { after(400) { if zRunning && zAmmo == 0 && !zReloading { zSpeak(["emptyshort"], "Empty.") } } }
     zStatusText()
 }
 
 private func zReload() {
-    if zReloading || zAmmo == CLIP { if zAmmo == CLIP { say("Already full.") }; return }
+    if zReloading || zAmmo == CLIP { if zAmmo == CLIP { zSpeak(["full"], "Already full.") }; return }
     zReloading = true
     play("z_reload", [.x(0.2), .z(-0.4), .gain(1.4)])
     after(1500) {
@@ -250,6 +308,18 @@ func zStatusLine(full: Bool) -> String {
     }
     return s
 }
+/// The status line as recorded clips: "Seven bullets. Four hits left. Wave three. Five zombies left. Aiming center. Nearest: left, close."
+func zStatusKeys() -> [String] {
+    var k = [zN(zAmmo), zAmmo == 1 ? "bullet" : "bullets", zN(zHealth), zHealth == 1 ? "hitleft" : "hitsleft"]
+    if zTrain < 0 {
+        let left = zToSpawn + zZombies.count
+        k += ["wave", zN(zWave), zN(left), left == 1 ? "zombieleft" : "zombiesleft"]
+    }
+    k += ["aiming", "lane_" + LANE_KEYS[zAim + 2]]
+    if let z = zZombies.min(by: { $0.dist < $1.dist }) { k += ["nearest", "lane_" + LANE_KEYS[z.lane + 2], z.dist < 2 ? "veryclose" : z.dist < 4.5 ? "close" : "far"] }
+    return k
+}
+
 /// Updates the words on screen without moving VoiceOver.
 private func zStatusText() {
     guard zRunning, screen.panel == .arena else { return }
@@ -266,13 +336,20 @@ private func zAfterKill() {
 
 private let HOWTO = "You walk forward on your own. Zombies come at you down five lanes: far left, left, center, right and far right. Swipe left or right to move your aim one lane; a note tells you where you're aiming, low on the left and high on the right. Tap to shoot. Swipe down to reload. Swipe up to hear your bullets, health and where they are. Two fingers double-tap to pause."
 
-private func arena(_ title: String, _ intro: String) {
+/// tap-to-continue between waves, when a game voice is on (VoiceOver may be muted, so no buttons)
+var zResting = false
+
+private func arena(_ title: String, _ intro: String, _ keys: [String]) {
     screen.landscape = zSideways
-    show(title, intro, [], .arena)
+    // the same fight area stays on screen between waves, so VoiceOver doesn't re-announce it every time
+    if screen.panel == .arena { screen.title = title; screen.text = intro; render() }
+    else { show(title, intro, [], .arena) }
     screen.mode = .game
     screen.text = zStatusLine(full: false)
     render()
-    say(intro)
+    var k = keys
+    if !zTipGiven && zVoice != "voiceover" { zTipGiven = true; k = ["tip_mute"] + k }
+    zSpeak(k, intro, urgent: true)
 }
 
 private func zStartWave() {
@@ -286,7 +363,9 @@ private func zStartWave() {
     music(zWave >= 4 ? "m_zfight2" : "m_zfight", 0.2, 3)
     wind(0.05)
     zStepIn = 1
-    arena("Wave " + str(zWave), "Wave " + str(zWave) + ". " + str(waveSize()) + " of them. " + (zWave == 1 ? "One at a time. You're aiming at the center lane." : zWave == 2 ? "Now two at once." : zWave == 4 ? "Watch for big ones. They take two shots." : zWave == 5 ? "Some of them run." : "Listen."))
+    let introKey = zWave == 1 ? "intro1" : zWave == 2 ? "intro2" : zWave == 4 ? "intro4" : zWave == 5 ? "intro5" : "listen"
+    arena("Wave " + str(zWave), "Wave " + str(zWave) + ". " + str(waveSize()) + " of them. " + (zWave == 1 ? "One at a time. You're aiming at the center lane." : zWave == 2 ? "Now two at once." : zWave == 4 ? "Watch for big ones. They take two shots." : zWave == 5 ? "Some of them run." : "Listen."),
+          ["wave", zN(zWave), zN(waveSize()), "ofthem", introKey])
     spawn {
         while zRunning {
             try await wait(100)
@@ -303,7 +382,17 @@ private func zWaveCleared() {
     let healed = zHealth < MAXH
     zHealth = Swift.min(zHealth + 1, MAXH)
     chime()
-    show("Wave " + str(zWave) + " cleared", "Silence. For now." + (healed ? " You catch your breath: " + str(zHealth) + " hits left." : "") + "\n\nWave " + str(zWave + 1) + " brings " + str(waveSize(zWave + 1)) + " of them, a little faster.", [
+    let text = "Silence. For now." + (healed ? " You catch your breath: " + str(zHealth) + " hits left." : "") + "\n\nWave " + str(zWave + 1) + " brings " + str(waveSize(zWave + 1)) + " of them, a little faster."
+    if zVoice != "voiceover" {
+        // VoiceOver may be muted: stay in the fight area and let a tap start the next wave
+        zResting = true
+        screen.title = "Wave " + str(zWave) + " cleared"
+        screen.text = text + "\n\nTap to start the next wave. Swipe up to hear how you're doing."
+        render()
+        zSpeak(["wave", zN(zWave), "cleared", zN(zHealth), zHealth == 1 ? "hitleft" : "hitsleft"], screen.text, urgent: true)
+        return
+    }
+    show("Wave " + str(zWave) + " cleared", text, [
         Choice("Next wave") { zStartWave() },
         Choice("Main menu", to("title")),
     ])
@@ -313,10 +402,13 @@ private func zDie() {
     zRunning = false
     clearScene()
     silenceAll()
+    zResting = false
     show("", "", [])
     scream()
     after(2600) {
         music("m_zrest", 0.22, 3)
+        // the end of the fight: back to buttons, so the player gets VoiceOver back
+        if zVoice != "voiceover" { zTipGiven = false; zSpeak(["overrun", "tip_unmute"], "Overrun. Three-finger double-tap to bring VoiceOver back.", urgent: true) }
         let cleared = zWave - 1
         let record = cleared > bestWave
         if record { bestWave = cleared }
@@ -329,6 +421,7 @@ private func zDie() {
 }
 
 func zNewRun() {
+    zResting = false
     zWave = 0; zKills = 0; zHealth = MAXH; zShots = 0; zHits = 0; zAim = 0; zTrain = -1
     zStartWave()
 }
@@ -352,13 +445,14 @@ private func zTrainSpawn(_ lane: Int) {
 
 private func zTrainShow() {
     let step = zTrain
-    arena("Training", TRAIN[step])
+    arena("Training", TRAIN[step], ["train\(step)"])
     if step == 0 {
-        // the five lanes, far left to far right, each from where its zombies will be
+        // the five lanes, far left to far right, each from where its zombies will be (after the voice has said so)
+        let start = zSpeakLength((zTipGiven && zVoice != "voiceover" ? ["tip_mute"] : []) + ["train0"]) / 1000 + 0.6
         for l in -2...2 {
-            tone([.type("triangle"), .f([262, 330, 392, 494, 587][l + 2]), .dur(0.12), .gain(0.2), .delay(0.6 + Double(l + 2) * 0.55)] + place(lane: l, 1.5))
+            tone([.type("triangle"), .f([262, 330, 392, 494, 587][l + 2]), .dur(0.12), .gain(0.2), .delay(start + Double(l + 2) * 0.55)] + place(lane: l, 1.5))
         }
-        after(4000) { if zTrain == 0 { zTrainSpawn(0) } }
+        after(start * 1000 + 3400) { if zTrain == 0 { zTrainSpawn(0) } }
     }
     if step == 2 { zTrainSpawn(2) }
     if step == 3 { zTrainSpawn(-1) }
@@ -372,6 +466,16 @@ private func zTrainNext() {
         zTrained = true
         clearScene()
         chime()
+        if zVoice != "voiceover" {
+            // VoiceOver may be muted: stay in the fight area, tap to start the real fight
+            zResting = true
+            zTrain = -2
+            screen.title = "Training done"
+            screen.text = "That's everything. Tap to start the fight."
+            render()
+            zSpeak(["traindone"], "That's everything. Start the fight when you're ready. Tap to start.", urgent: true)
+            return
+        }
         show("Training done", "That's everything. In a real fight they keep coming, more at once each wave, and if one reaches you it bites. Five bites and it's over; you get one back after every wave you clear.\n\nTwo fingers double-tap pauses the fight at any time.", [
             Choice("Start the fight") { zNewRun() },
             Choice("Back", to("x_start")),
@@ -381,23 +485,42 @@ private func zTrainNext() {
     after(zTrain == 1 ? 1200 : 600) { zTrainShow() }
 }
 
+/// Switches to the next voice, loads its clips, and plays a sample of it.
+@MainActor func zNextVoice() async {
+    let old = zVoice
+    let next = ZVOICES[(ZVOICES.firstIndex(of: old)! + 1) % ZVOICES.count]
+    if zvRecorded(next) { _ = await audio.load(zvClips(next)) }
+    if zvRecorded(old) { audio.unload(zvClips(old)) }
+    zVoice = next
+    go("x_start")
+    switch next {
+    case "voiceover": say("VoiceOver only. The game speaks through VoiceOver, as before.")
+    case "iphone": if let f = onSpeak { f("This is the voice you'll hear in Last Stand. Zombie, far left.", true) }
+    default: zSpeak(["hello"], "This is the voice you'll hear in Last Stand.", urgent: true)
+    }
+}
+
 /* ---------- scenes ---------- */
 
 func registerZombies() {
     scene("x_start") {
         silenceAll()
         zRunning = false
+        zResting = false
+        zTipGiven = false
         var choices = [Choice("Start the fight") { zNewRun() }, Choice("Training") { go("x_train") }]
         if !zTrained { choices.swapAt(0, 1) }
         choices += [
             Choice("Aim helper, ticking while you're aimed at one: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
             Choice("Call out where they are: " + (zCallouts ? "on" : "off")) { zCallouts.toggle(); go("x_start") },
             Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
+            Choice("Game voice: " + (ZVOICE_NAMES[zVoice] ?? zVoice) + ". Double-tap to switch and hear it") { await zNextVoice() },
             Choice("Back", to("title")),
         ]
-        show("Last Stand", "You, a pistol, and the dark. They come in waves. You'll only hear them.\n\n" + HOWTO + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)
+        show("Last Stand", "You, a pistol, and the dark. They come in waves. You'll only hear them.\n\n" + HOWTO + "\n\nThe game can talk for itself during the fight: pick a game voice below, then mute VoiceOver with a three-finger double-tap when the fight starts." + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)
     }
     scene("x_train") {
+        zResting = false
         zWave = 0; zHealth = MAXH; zAmmo = CLIP; zAim = 0; zReloading = false; zZombies = []
         zTrain = 0
         zRunning = true

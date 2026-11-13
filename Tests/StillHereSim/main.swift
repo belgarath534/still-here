@@ -463,7 +463,8 @@ var currentRun = ""
     zGesture(.status)
     try await waitTitle("Training done")
     guard zTrained else { throw Failure(msg: "training not remembered") }
-    try await click("Start the fight"); try await waitTitle("Wave 1")
+    if zResting { zGesture(.shoot) } else { try await click("Start the fight") }
+    try await waitTitle("Wave 1")
 }
 
 /// Three waves, played by a bot that aims by ear.
@@ -476,9 +477,13 @@ var currentRun = ""
             if zWave == 3 {
                 guard bestWave == 3 else { throw Failure(msg: "best wave not saved") }
                 guard mockAudio.played.contains(where: { $0.hasPrefix("z_step") }) else { throw Failure(msg: "no footsteps while walking") }
+                if zvRecorded(zVoice) {
+                    guard mockAudio.played.contains(where: { $0.hasPrefix("zv_\(zVoice)_new_") }),
+                          mockAudio.played.contains("zv_\(zVoice)_tip_mute") else { throw Failure(msg: "the game voice \(zVoice) never spoke") }
+                }
                 return
             }
-            try await click("Next wave"); continue
+            if zResting { zGesture(.shoot); try await wait(300) } else { try await click("Next wave") }; continue
         }
         if zRunning { fightStep() }
         try await wait(300)
@@ -505,7 +510,7 @@ var currentRun = ""
         if screen.title == "Overrun" { throw Failure(msg: "a slow player was overrun: " + screen.text) }
         if screen.title.hasSuffix("cleared") {
             if zWave == 2 { return }
-            try await click("Next wave"); continue
+            if zResting { zGesture(.shoot); try await wait(300) } else { try await click("Next wave") }; continue
         }
         if zRunning {
             if zAmmo == 0 { zGesture(.reload) }
@@ -535,6 +540,8 @@ let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
     ("ch16-delete", "c16", { try await ch16(true) }), ("ch16-echo", "c16", { try await ch16(false) }),
     ("endless", "e_start", endless), ("endless-death", "e_start", endlessDeath),
     ("zombie-training", "x_start", zombieTraining), ("zombie-fight", "x_start", zombieFight), ("zombie-death", "x_start", zombieDeath), ("zombie-slow", "x_start", zombieSlow),
+    ("zombie-fight-voiceover", "x_start", { zVoice = "voiceover"; defer { zVoice = "joe" }; try await zombieFight() }),
+    ("zombie-fight-kristin", "x_start", { zVoice = "kristin"; chLoaded.remove("x"); go("x_start"); try await Task.sleep(nanoseconds: 50_000_000); defer { zVoice = "joe" }; try await zombieFight() }),
 ]
 
 @MainActor func runAll() async {

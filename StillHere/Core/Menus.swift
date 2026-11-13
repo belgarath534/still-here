@@ -151,9 +151,11 @@ func registerMenus() {
         show("Headphone check", "Put your headphones on now. You'll hear a drop of water in one ear. Which ear?", [
             Choice("Left ear") { checkAnswer(-1) },
             Choice("Right ear") { checkAnswer(1) },
-            Choice("Play the sound again") { drip(checkSide * 2) },
+            // a moment's wait, so VoiceOver has finished speaking and isn't ducking the drip
+            Choice("Play the sound again") { after(700) { drip(checkSide * 2) } },
         ])
-        after(4500) { drip(checkSide * 2) }
+        // VoiceOver reads the question first; drip a few times after it should be done
+        for (i, t) in [7000.0, 9000, 11000].enumerated() { after(t) { if i == 0 || screen.title == "Headphone check" { drip(checkSide * 2) } } }
     }
 
     scene("endings") {

@@ -298,6 +298,8 @@ let CH_SFX: [String: [String]] = [
   "x": Z_SFX,
 ]
 var chLoaded: Set<String> = []
+/// a chapter's sounds; Last Stand also needs the clips of the chosen game voice
+func chapterSounds(_ key: String) -> [String] { (CH_SFX[key] ?? []) + (key == "x" ? zvClips(zVoice) : []) }
 var bootLoaded = false
 func chapterKey(_ id: String) -> String? {
     if id.hasPrefix("c"), let n = Int(id.dropFirst().prefix(while: { $0.isNumber })), n >= 6 { return "c\(n)" }
@@ -309,10 +311,10 @@ func chapterKey(_ id: String) -> String? {
 @MainActor func loadChapter(_ key: String) async -> Bool {
     for k in chLoaded where k != key && k != "tapes" {
         // keep anything the boot set also needs
-        audio.unload(CH_SFX[k]!.filter { !SFX.contains($0) && !(CH_SFX[key] ?? []).contains($0) })
+        audio.unload(chapterSounds(k).filter { !SFX.contains($0) && !chapterSounds(key).contains($0) })
         chLoaded.remove(k)
     }
-    guard await audio.load(CH_SFX[key]!) else { return false }
+    guard await audio.load(chapterSounds(key)) else { return false }
     chLoaded.insert(key)
     return true
 }

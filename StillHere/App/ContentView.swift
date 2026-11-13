@@ -43,7 +43,7 @@ struct ContentView: View {
 
             // Last Stand: the whole screen takes swipes and taps
             if arena && !model.paused {
-                GestureArea(label: "Fight area. " + model.screen.title,
+                GestureArea(label: "Fight area",
                             onGesture: { g in Task { @MainActor in zGesture(g) } },
                             onPause: { model.togglePause() })
                     .ignoresSafeArea()

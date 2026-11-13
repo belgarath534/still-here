@@ -12,7 +12,7 @@ struct GestureArea: UIViewRepresentable {
         let v = TouchView()
         v.isAccessibilityElement = true
         v.accessibilityTraits = [.allowsDirectInteraction]
-        v.accessibilityHint = "Swipe left or right to turn. Tap to shoot. Swipe down to reload. Swipe up for status. Two fingers double-tap to pause."
+        // no hint: VoiceOver would read it again at every wave
         v.backgroundColor = .clear
         let c = context.coordinator
         for (dir, touches) in [(UISwipeGestureRecognizer.Direction.left, 1), (.right, 1), (.up, 1), (.down, 1), (.down, 2)] {

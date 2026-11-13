@@ -59,8 +59,10 @@ func tone(_ list: [O]) {
 func uiClick() { tone([.f(160), .f2(70), .dur(0.12), .gain(0.25), .z(-0.6)]) }
 
 func drip(_ x: Double) {
-    tone([.f(1500), .f2(380), .dur(0.12), .gain(0.6), .x(x), .z(-0.5)])
-    tone([.f(1400), .f2(360), .dur(0.12), .gain(0.15), .x(x), .z(-0.5), .delay(0.18)])
+    // close to the ear (not 2 m away) and loud, so it still comes through when VoiceOver ducks the game's sound
+    let side = x < 0 ? -1.2 : x > 0 ? 1.2 : 0
+    tone([.f(1500), .f2(380), .dur(0.16), .gain(0.9), .x(side), .z(-0.2)])
+    tone([.f(1400), .f2(360), .dur(0.14), .gain(0.35), .x(side), .z(-0.2), .delay(0.2)])
 }
 
 var heartBpm = 0.0

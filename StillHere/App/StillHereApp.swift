@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import UIKit
 
 @main
@@ -13,6 +14,7 @@ struct StillHereApp: App {
         audio = AVBackend()
         startGame()
         onFeedback = openFeedbackEmail
+        onSpeak = { text, urgent in GameSpeech.shared.say(text, urgent: urgent) }
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-shot"), i + 1 < args.count { screenshotScene(args[i + 1]) }
     }
@@ -38,6 +40,20 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             scene.windows.first?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: on ? .landscape : .portrait)) { _ in }
         }
+    }
+}
+
+/// Last Stand's "iPhone's own voice": the phone's speech, so the game can talk while VoiceOver is muted.
+final class GameSpeech {
+    static let shared = GameSpeech()
+    private let synth = AVSpeechSynthesizer()
+    func say(_ text: String, urgent: Bool) {
+        if urgent { synth.stopSpeaking(at: .immediate) }
+        let u = AVSpeechUtterance(string: text)
+        u.voice = AVSpeechSynthesisVoice(language: AVSpeechSynthesisVoice.currentLanguageCode().hasPrefix("en") ? AVSpeechSynthesisVoice.currentLanguageCode() : "en-US")
+        u.rate = min(AVSpeechUtteranceDefaultSpeechRate * 1.15, AVSpeechUtteranceMaximumSpeechRate)
+        u.volume = 1
+        synth.speak(u)
     }
 }
 
