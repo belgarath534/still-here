@@ -14,6 +14,7 @@ struct StillHereApp: App {
         audio = AVBackend()
         startGame()
         onFeedback = openFeedbackEmail
+        isVoiceOverRunning = { UIAccessibility.isVoiceOverRunning }
         onSpeak = { text, urgent in GameSpeech.shared.say(text, urgent: urgent) }
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-shot"), i + 1 < args.count { screenshotScene(args[i + 1]) }

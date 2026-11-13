@@ -86,10 +86,10 @@ struct ContentView: View {
             if phase != .active { openPause() }
         }
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
-        .alert("Content note", isPresented: Binding(get: { model.note != nil }, set: { _ in })) {
+        .alert(model.note?.hasPrefix("Tip:") == true ? "Tip" : "Content note", isPresented: Binding(get: { model.note != nil }, set: { _ in })) {
             Button("OK") { model.noteDismissed() }
         } message: {
-            Text(model.note ?? "")
+            Text(model.note.map { $0.hasPrefix("Tip: ") ? String($0.dropFirst(5)) : $0 } ?? "")
         }
     }
 

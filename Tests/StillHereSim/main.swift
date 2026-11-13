@@ -490,6 +490,19 @@ var currentRun = ""
     }
 }
 
+/// With VoiceOver on and a game voice, the first fight starts with the mute tip; the second doesn't.
+@MainActor func zombieTip() async throws {
+    isVoiceOverRunning = { true }; defer { isVoiceOverRunning = { false } }
+    zAlertShown = false
+    let before = mockView.notes
+    try await waitTitle("Last Stand"); try await click("Start the fight"); try await waitTitle("Wave 1")
+    guard mockView.notes == before + 1 else { throw Failure(msg: "no VoiceOver tip before the fight") }
+    zRunning = false; go("x_start")
+    try await waitTitle("Last Stand"); try await click("Start the fight"); try await waitTitle("Wave 1")
+    guard mockView.notes == before + 1 else { throw Failure(msg: "the tip showed twice") }
+    zRunning = false
+}
+
 /// Doing nothing: they get you, and the end screen has a way out.
 @MainActor func zombieDeath() async throws {
     try await waitTitle("Last Stand"); try await click("Start the fight")
@@ -540,6 +553,7 @@ let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
     ("ch16-delete", "c16", { try await ch16(true) }), ("ch16-echo", "c16", { try await ch16(false) }),
     ("endless", "e_start", endless), ("endless-death", "e_start", endlessDeath),
     ("zombie-training", "x_start", zombieTraining), ("zombie-fight", "x_start", zombieFight), ("zombie-death", "x_start", zombieDeath), ("zombie-slow", "x_start", zombieSlow),
+    ("zombie-tip", "x_start", zombieTip),
     ("zombie-fight-voiceover", "x_start", { zVoice = "voiceover"; defer { zVoice = "joe" }; try await zombieFight() }),
     ("zombie-fight-kristin", "x_start", { zVoice = "kristin"; chLoaded.remove("x"); go("x_start"); try await Task.sleep(nanoseconds: 50_000_000); defer { zVoice = "joe" }; try await zombieFight() }),
 ]

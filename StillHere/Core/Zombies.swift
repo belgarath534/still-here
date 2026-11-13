@@ -89,6 +89,19 @@ private var zvQueue: [String] = []
 private var zvPlaying = false
 /// whether the player has heard the "mute VoiceOver" tip in this visit to Last Stand
 var zTipGiven = false
+/// the app tells us whether VoiceOver is running; tests leave it off
+var isVoiceOverRunning: () -> Bool = { false }
+/// the "you can mute VoiceOver" alert, shown once each time the app is opened
+var zAlertShown = false
+let Z_VO_TIP = "Tip: Last Stand speaks for itself. To hear the fight clearly, mute VoiceOver's speech with a three-finger double-tap, or turn VoiceOver off. Your swipes and taps work either way. When the fight ends, three-finger double-tap again to bring VoiceOver back."
+
+/// Before a fight: with a game voice and VoiceOver on, a real alert explains muting VoiceOver, once per app launch.
+@MainActor func zWithTip(_ next: @escaping @MainActor () -> Void) {
+    if zVoice != "voiceover" && isVoiceOverRunning() && !zAlertShown, let v = view {
+        zAlertShown = true
+        v.contentNote(Z_VO_TIP) { Task { @MainActor in next() } }
+    } else { next() }
+}
 
 /// Says something in the chosen voice. `keys` are recorded clips joined together; `text` is the same in words.
 func zSpeak(_ keys: [String], _ text: String, urgent: Bool = false) {
@@ -508,7 +521,7 @@ func registerZombies() {
         zRunning = false
         zResting = false
         zTipGiven = false
-        var choices = [Choice("Start the fight") { zNewRun() }, Choice("Training") { go("x_train") }]
+        var choices = [Choice("Start the fight") { zWithTip { zNewRun() } }, Choice("Training") { zWithTip { go("x_train") } }]
         if !zTrained { choices.swapAt(0, 1) }
         choices += [
             Choice("Aim helper, ticking while you're aimed at one: " + (zAimHelp ? "on" : "off")) { zAimHelp.toggle(); go("x_start") },
