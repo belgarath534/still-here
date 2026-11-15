@@ -528,7 +528,7 @@ func registerZombies() {
             Choice("Call out where they are: " + (zCallouts ? "on" : "off")) { zCallouts.toggle(); go("x_start") },
             Choice("Turn the phone sideways for the fight: " + (zSideways ? "on" : "off")) { zSideways.toggle(); go("x_start") },
             Choice("Game voice: " + (ZVOICE_NAMES[zVoice] ?? zVoice) + ". Double-tap to switch and hear it") { await zNextVoice() },
-            Choice("Back", to("title")),
+            Choice("Back", to("modes")),
         ]
         show("Last Stand", "You, a pistol, and the dark. They come in waves. You'll only hear them.\n\n" + HOWTO + "\n\nThe game can talk for itself during the fight: pick a game voice below, then mute VoiceOver with a three-finger double-tap when the fight starts." + (zTrained ? "" : "\n\nNew here? Start with the training.") + (bestWave > 0 ? "\n\nYour best: " + str(bestWave) + (bestWave == 1 ? " wave." : " waves.") : ""), choices)
     }

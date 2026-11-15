@@ -393,6 +393,7 @@ func silenceAll() {
     heartStop(); musicCut()
     rain(0); engine(0)
     offCar(); offCh4(); offCh5(); offAct2(); drips(false); offAct4()
+    stQuiet()
 }
 
 /// a tape melting in the fire

@@ -1,0 +1,139 @@
+{
+ "how": "Record with ElevenLabs eleven_v4, one clip per line, as StillHere/Audio/st_v_<key>.mp3, then set ST_VOICE_READY = true in Stranded.swift and add the durations to Tests/StillHereSim/durations.json.",
+ "voices": {
+  "jess": "1cxc5c3E9K6F1wlqOJGV",
+  "tia": "jdrqQ2ZMWENd1cuRByWG"
+ },
+ "lines": [
+  {
+   "key": "wake",
+   "voice": "jess",
+   "prompt": "[shaky, breathless, trying to stay calm] Okay. Okay. Breathe, Jess. You're alive. You're on a beach. The ferry is... the ferry is gone. Tía always said, when you're scared, talk out loud. So I'm talking."
+  },
+  {
+   "key": "mem1",
+   "voice": "jess",
+   "prompt": "[quiet, remembering, fragile] I was six. Mom and Dad went out for their anniversary. It was raining, like that night at the motel. The phone rang at two in the morning, and I remember the sound Tía made. Not a scream. Just air going out of her."
+  },
+  {
+   "key": "mem2",
+   "voice": "jess",
+   "prompt": "[soft, tender] She came to get me in her nightgown and a raincoat. She didn't let go of my hand for a week. Not in the hospital, not at the funeral, not in the car. I think she was scared that if she let go, I'd go too."
+  },
+  {
+   "key": "mem3",
+   "voice": "jess",
+   "prompt": "[warm, a little teary, half-singing the lullaby line] She raised me in that little blue house. She worked nights at the laundry, and every night before she left, she sang me the sparrow song. Little sparrow, don't you cry, the dark is just the day asleep. I hated it when I was twelve. I'd give anything to hear it now."
+  },
+  {
+   "key": "mem4",
+   "voice": "jess",
+   "prompt": "[wry, then softening] When I was fifteen, I ran away. Got as far as the bus station. I was so angry. At Mom and Dad for dying, at her for not being them. She found me at four in the morning. She didn't yell. She sat down next to me and said, mija, you can be angry. Just be angry at home."
+  },
+  {
+   "key": "mem5",
+   "voice": "jess",
+   "prompt": "[low, honest, a bit defiant] That's why I came back for you. At the motel. Everyone thinks I'm brave. I'm not. I just know what it's like to be the one left behind, and I'm not doing that to anybody. Ever."
+  },
+  {
+   "key": "mem6",
+   "voice": "jess",
+   "prompt": "[uneasy, whispering] When it took her, that week in Elk Ridge, it learned her voice by making her talk. Every night, in the dark. I keep thinking: what did she tell it? Did she tell it about me? Is that how it knew my name?"
+  },
+  {
+   "key": "mem7",
+   "voice": "jess",
+   "prompt": "[quiet, close to the mic, holding back tears, then a small brave smile] If someone finds this beach and I'm not here... Tía, I'm sorry I never called enough. And to you, at home: you never asked about my family. I liked that you never asked. I was going to tell you all of it. I still am."
+  },
+  {
+   "key": "water",
+   "voice": "jess",
+   "prompt": "[tired relief, small laugh] Rainwater, in the curve of a palm leaf. Tastes like dirt. Best thing I've ever had."
+  },
+  {
+   "key": "fish",
+   "voice": "jess",
+   "prompt": "[excited, then deadpan] Got one! Okay, it's tiny. It's a tiny, ugly fish. It's dinner."
+  },
+  {
+   "key": "nofish",
+   "voice": "jess",
+   "prompt": "[frustrated, joking] Nothing. They're laughing at me down there, I know it."
+  },
+  {
+   "key": "wood",
+   "voice": "jess",
+   "prompt": "[focused, affectionate] Driftwood. Dry on top. Tía would say, a fire is a friend you have to feed."
+  },
+  {
+   "key": "shelter",
+   "voice": "jess",
+   "prompt": "[proud, wry] It's a roof. It's a terrible roof. But it's mine."
+  },
+  {
+   "key": "signal",
+   "voice": "jess",
+   "prompt": "[breathless, hopeful] Another pile on the hill. If anyone sails past at night, they'll see it. They have to."
+  },
+  {
+   "key": "wreck",
+   "voice": "jess",
+   "prompt": "[steadying herself, quiet] Bits of the ferry, all along the rocks. A life vest. Somebody's shoe. Don't think about it. Just look for anything useful."
+  },
+  {
+   "key": "boat",
+   "voice": "jess",
+   "prompt": "[shocked, then shouting, frantic] Is that... an engine? That's an engine! The signal fire, now, now, now!"
+  },
+  {
+   "key": "nowood",
+   "voice": "jess",
+   "prompt": "[desperate shouting, voice breaking] No! No dry wood! Come back! Please come back!"
+  },
+  {
+   "key": "tia1",
+   "voice": "tia",
+   "prompt": "[warm, loving, slightly too calm, from far away] Mija... come in. The water's warm. I'm right here. I came all this way for you."
+  },
+  {
+   "key": "tia2",
+   "voice": "tia",
+   "prompt": "[singing softly, then coaxing, from far away] Little sparrow, don't you cry... come in, mija. Come home."
+  },
+  {
+   "key": "notTia",
+   "voice": "jess",
+   "prompt": "[whispering, trembling, firm] Tía is in a hospital bed three thousand miles away. That isn't her. That is not her."
+  },
+  {
+   "key": "steps",
+   "voice": "jess",
+   "prompt": "[barely a whisper, terrified] Someone's walking around the fire. Don't move. Don't breathe."
+  },
+  {
+   "key": "storm",
+   "voice": "jess",
+   "prompt": "[shouting over the wind] The wind's taking everything. I can only hold on to one thing."
+  },
+  {
+   "key": "whisper",
+   "voice": "jess",
+   "prompt": "[whispering, frightened] It's in the trees, saying my name. Jessica. Nobody calls me Jessica."
+  },
+  {
+   "key": "rescued",
+   "voice": "jess",
+   "prompt": "[crying and laughing at once, overwhelmed] They're real. They're real! Their boots are wet and they're shouting and they smell like diesel and they're real. Take me home. Please. Someone's waiting for me."
+  },
+  {
+   "key": "drowned",
+   "voice": "jess",
+   "prompt": "[faint, drifting, confused] Tía? Tía, it's so cold..."
+  },
+  {
+   "key": "faded",
+   "voice": "jess",
+   "prompt": "[very tired, gentle, fading] I'm just going to close my eyes for a minute. Just a minute."
+  }
+ ]
+}

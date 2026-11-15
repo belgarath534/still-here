@@ -190,7 +190,7 @@ func scene(_ id: String, _ checkpoint: Bool = false, _ fn: @escaping @MainActor 
 }
 func to(_ id: String) -> @MainActor () async throws -> Void { { go(id) } }
 
-let MENUS: Set<String> = ["splash", "title", "chapters", "settings", "howto", "credits", "reset", "check", "endings", "tapes"]
+let MENUS: Set<String> = ["splash", "title", "chapters", "settings", "howto", "credits", "reset", "check", "endings", "tapes", "modes"]
 
 func clearScene() {
     cancelTimers()
@@ -296,16 +296,20 @@ let CH_SFX: [String: [String]] = [
   "c16": ["a16_plan","a16_tower","a16_beg","a16_forget","a16_who","a16_say","a16_there","a16_ruizend","a16_news","a13_asst","a15_danny","c8_alv1","c11_cr"],
   "tapes": ["t1","t2","t3","t4"],
   "x": Z_SFX,
+  "w": ST_SFX,
 ]
 var chLoaded: Set<String> = []
 /// a chapter's sounds; Last Stand also needs the clips of the chosen game voice
-func chapterSounds(_ key: String) -> [String] { (CH_SFX[key] ?? []) + (key == "x" ? zvClips(zVoice) : []) }
+func chapterSounds(_ key: String) -> [String] {
+    (CH_SFX[key] ?? []) + (key == "x" ? zvClips(zVoice) : []) + (key == "w" && ST_VOICE_READY ? ST_LINES.map { "st_v_" + $0.key } : [])
+}
 var bootLoaded = false
 func chapterKey(_ id: String) -> String? {
     if id.hasPrefix("c"), let n = Int(id.dropFirst().prefix(while: { $0.isNumber })), n >= 6 { return "c\(n)" }
     if id.hasPrefix("z") { return "z" }
     if id == "tapes" { return "tapes" }
     if id.hasPrefix("x_") { return "x" }
+    if id.hasPrefix("w_") { return "w" }
     return nil
 }
 @MainActor func loadChapter(_ key: String) async -> Bool {

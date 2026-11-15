@@ -540,6 +540,72 @@ var currentRun = ""
     }
 }
 
+/* ---------- Stranded ---------- */
+
+/// Plays Stranded sensibly until rescued: keeps water and food up, builds shelter and the signal fire, never goes into the water.
+@MainActor func strandedRescue() async throws {
+    try await waitTitle("Stranded"); try await click("Begin")
+    try await waitTitle("Washed up"); try await click("Get up")
+    var handled = -1
+    var memories = 0
+    while true {
+        try await waitFor("something to do") { screen.id != handled && !screen.choices.isEmpty }
+        let s = screen
+        handled = s.id
+        let has = { (p: String) in s.choices.contains { $0.label.hasPrefix(p) } }
+        if s.title == "Rescued" { print("  rescued on day \(stDay), after \(memories) memories"); guard memories >= 3 else { throw Failure(msg: "rescued before hearing Jess's story") }; return }
+        if s.title == "The island keeps her" { throw Failure(msg: "died on day \(stDay): " + s.text) }
+        if stDay > 25 { throw Failure(msg: "no rescue after 25 days") }
+        if s.title.hasSuffix("Jess remembers") { memories += 1; try await click("Listen to the night"); continue }
+        if has("Light the signal fire!") { try await click("Light the signal fire!"); continue }
+        if has("Get up") { try await click("Get up"); continue }
+        if has("Wait for morning") { try await click("Wait for morning"); continue }
+        if has("Stay by the fire") { try await click("Stay by the fire"); continue }
+        if has("Shield the fire") { try await click("Shield the fire"); continue }
+        if has("Throw it to the left") { try await click(stSide < 0 ? "Throw it to the left" : "Throw it to the right"); continue }
+        if has("Grab a burning stick") { continue }   // hold still: the footsteps leave on their own
+        if s.title.hasPrefix("Evening") {
+            // keep one piece back for the boat once the signal fire is ready
+            if has("Light the fire") && (stSignal < 3 || stWood >= 2) { try await click("Light the fire") } else { try await click(stWood > 0 ? "Save the wood" : "Sit in the dark") }
+            continue
+        }
+        if s.title.hasPrefix("Day") {
+            if stWater < 45 { try await click("Look for fresh water") }
+            else if stFood < 45 { try await click("Fish in the shallows") }
+            else if has("Search the wreckage") { try await click("Search the wreckage") }
+            else if stShelter < 2 && stWood >= 2 { try await click("Work on the shelter") }
+            else if stSignal < 3 && stWood >= 3 { try await click("Stack the signal fire") }
+            else { try await click("Gather driftwood") }
+            continue
+        }
+        throw Failure(msg: "don't know what to do on “\(s.title)”: \(s.choices.map(\.label))")
+    }
+}
+
+/// Answering the voice in the water ends the run, and the end screen has a way out.
+@MainActor func strandedDrown() async throws {
+    try await waitTitle("Stranded"); try await click("Begin")
+    try await waitTitle("Washed up"); try await click("Get up")
+    stLastNight = "steps"   // nights pick anything but the last one; make the voice likely
+    var handled = -1
+    while true {
+        try await waitFor("something to do") { screen.id != handled && !screen.choices.isEmpty }
+        let s = screen
+        handled = s.id
+        let has = { (p: String) in s.choices.contains { $0.label.hasPrefix(p) } }
+        if s.title == "The island keeps her" {
+            guard s.choices.map(\.label) == ["Try again", "Main menu"] else { throw Failure(msg: "end screen: \(s.choices.map(\.label))") }
+            if stWater > 0 && stFood > 0 && stWarmth > 0 && !s.text.contains("voice said") { throw Failure(msg: "died without a reason: " + s.text) }
+            return
+        }
+        if stDay > 15 { throw Failure(msg: "never met the voice in the water") }
+        if has("Walk into the water") { try await click("Walk into the water"); continue }
+        if s.title.hasSuffix("Jess remembers") { try await click("Listen to the night"); continue }
+        for p in ["Get up", "Wait for morning", "Shield the fire", "Throw it to the left", "Light the fire", "Sit in the dark", "Save the wood"] where has(p) { try await click(p); break }
+        if s.title.hasPrefix("Day") { try await click(stWater < 50 ? "Look for fresh water" : stFood < 50 ? "Fish in the shallows" : "Gather driftwood") }
+    }
+}
+
 /* ---------- runner ---------- */
 
 let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
@@ -554,6 +620,7 @@ let RUNS: [(String, String, @MainActor () async throws -> Void)] = [
     ("endless", "e_start", endless), ("endless-death", "e_start", endlessDeath),
     ("zombie-training", "x_start", zombieTraining), ("zombie-fight", "x_start", zombieFight), ("zombie-death", "x_start", zombieDeath), ("zombie-slow", "x_start", zombieSlow),
     ("zombie-tip", "x_start", zombieTip),
+    ("stranded-rescue", "w_start", strandedRescue), ("stranded-drown", "w_start", strandedDrown),
     ("zombie-fight-voiceover", "x_start", { zVoice = "voiceover"; defer { zVoice = "joe" }; try await zombieFight() }),
     ("zombie-fight-kristin", "x_start", { zVoice = "kristin"; chLoaded.remove("x"); go("x_start"); try await Task.sleep(nanoseconds: 50_000_000); defer { zVoice = "joe" }; try await zombieFight() }),
 ]

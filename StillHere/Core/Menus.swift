@@ -27,6 +27,7 @@ func startGame() {
     registerStory()
     registerEndless()
     registerZombies()
+    registerStranded()
     go("splash")
 }
 
@@ -98,8 +99,7 @@ func registerMenus() {
         if let cp = checkpoint, SCENES[cp] != nil { choices.append(Choice("Continue: " + chapterOf(cp).name) { try await start(cp) }) }
         choices += [
             Choice("New game") { try await start("s1") },
-            Choice("Endless Night: survival mode" + (bestNight > 0 ? ", best " + str(bestNight) : "")) { try await start("e_start") },
-            Choice("Last Stand: zombie survival" + (bestWave > 0 ? ", best wave " + str(bestWave) : "")) { try await start("x_start") },
+            Choice("Survival modes: Endless Night, Last Stand, Stranded", to("modes")),
             Choice("Chapters", to("chapters")),
             Choice("Settings", to("settings")),
             Choice("Endings found: " + str(endings.length) + " of " + str(ENDINGS.length), to("endings")),
@@ -111,6 +111,17 @@ func registerMenus() {
             Choice("Credits", to("credits")),
         ]
         show("Main menu", "Sixteen chapters and two interludes, four or five hours in all. Things change a little every time you play.", choices)
+    }
+
+    // the extra modes, together in one place so the main menu stays about the story
+    scene("modes") {
+        menuMusic()
+        show("Survival modes", "Three ways to play outside the story.", [
+            Choice("Stranded: play as Jess, alone on an island" + (stBestDays > 0 ? ", longest " + str(stBestDays) + (stBestDays == 1 ? " day" : " days") : "")) { try await start("w_start") },
+            Choice("Last Stand: zombie survival" + (bestWave > 0 ? ", best wave " + str(bestWave) : "")) { try await start("x_start") },
+            Choice("Endless Night: survive the encounters" + (bestNight > 0 ? ", best " + str(bestNight) : "")) { try await start("e_start") },
+            Choice("Back", to("title")),
+        ])
     }
 
     scene("chapters") {

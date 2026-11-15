@@ -225,7 +225,7 @@ func registerEndless() {
         night = 0
         show("Endless Night", "No story. No checkpoints. Just the dark, and things that want in.\n\nEvery night brings a handful of encounters from the whole game: something rushing at you, tapping at the windows, knocking at the door, circling you, crawling in the vents. Each night is a little faster and a little longer.\n\nOne mistake and it's over. " + (bestNight > 0 ? "Your best: " + str(bestNight) + (bestNight == 1 ? " night." : " nights.") : "How many nights can you last?"), [
             Choice("Begin", to("e_night")),
-            Choice("Back", to("title")),
+            Choice("Back", to("modes")),
         ])
     }
     scene("e_night") {
